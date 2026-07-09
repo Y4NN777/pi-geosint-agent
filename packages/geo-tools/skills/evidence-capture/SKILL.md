@@ -1,6 +1,6 @@
 ---
 name: evidence-capture
-description: Capture image evidence from KartaView — direct download or headless browser render.
+description: Capture image evidence from KartaView and Google Street View — direct download or headless browser render.
 allowed-tools:
   - capture-direct
   - capture-render
@@ -8,15 +8,17 @@ allowed-tools:
 
 # evidence-capture
 
-Capture image evidence from approved candidate sequences. Two paths: direct download (default) or headless render (fallback).
+Capture image evidence from candidate records. Two paths: direct download (default) or headless render (fallback). Supports both KartaView photo URLs and Google Street View Static API URLs.
 
 ## Default Path: Direct Download
 
-All candidates default to `needs_render: false`. The `capture-direct` function downloads image bytes from the KartaView photo URL:
+All candidates default to `needs_render: false`. The `capture-direct` function downloads image bytes from the photo or static API URL:
 
 ```
-candidate.photoUrl → HTTP GET → bytes → sha256 → store
+candidate.url → HTTP GET → bytes → sha256 → store
 ```
+
+For Google Street View, the URL is a Static API endpoint with heading, pitch, fov, and size parameters baked in by `street-view-discover`.
 
 ## Render Path: Headless Browser
 
@@ -27,9 +29,16 @@ candidate.url → xvfb-run cutycapt --url=... --out=... → png bytes → sha256
 ```
 
 The render path is used when:
-1. The KartaView photo URL is a viewer page (not a direct image URL)
+1. The candidate URL is a viewer page (not a direct image URL)
 2. Direct download returned a non-image response in a prior attempt
-3. The human reviewer manually set `needs_render: true`
+
+## Source-Specific Notes
+
+| Source | URL Pattern | Capture Method |
+|--------|-------------|----------------|
+| KartaView | `https://kartaview.org/...` (photo detail page) | render (viewer page)
+| KartaView | Direct image URL from `photo.url` | direct download
+| Google Street View | `https://maps.googleapis.com/maps/api/streetview?...` | direct download (Static API returns raw image)
 
 ## Timeouts
 
@@ -45,3 +54,4 @@ Single capture failure does not abort the batch. Failed captures are recorded as
 ## See Also
 
 Full capture path rules: `workspace/_config/capture-path-rules.md`
+Google Street View discovery: `packages/geo-tools/skills/street-view-discovery/SKILL.md`
