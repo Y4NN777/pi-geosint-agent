@@ -1,0 +1,16 @@
+node_modules/
+.git/
+.gitattributes
+.gitignore
+dist/
+coverage/
+*.md
+!README.md
+.env*
+__pycache__/
+*.pyc
+.pnp.*
+.yarn/
+.cache/
+.tmp/
+npm-debug.log*

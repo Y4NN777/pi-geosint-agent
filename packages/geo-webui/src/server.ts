@@ -60,7 +60,7 @@ interface Settings {
 // ── State ──────────────────────────────────────────────────────────────
 
 const runs = new Map<string, PipelineRun>();
-const frontendDir = new URL("./frontend", import.meta.url).pathname;
+const frontendDir = join(import.meta.dirname, "..", "src", "frontend");
 const defaultSettings: Settings = {
 	workspaceRoot: join(process.cwd(), "workspace"),
 	storageRoot: join(process.cwd(), "evidence"),
@@ -474,6 +474,15 @@ function readBody(req: IncomingMessage): Promise<string> {
 		req.on("error", reject);
 	});
 }
+
+// ── Main ────────────────────────────────────────────────────────────────
+
+if (process.argv[1] === import.meta.filename) {
+	const PORT = Number(process.env.PORT) || 8080;
+	startServer(PORT);
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────
 
 function listAllEvidence(dbPath: string, limit: number): Array<{ capturedAt: string; source: string; path: string }> {
 	try {

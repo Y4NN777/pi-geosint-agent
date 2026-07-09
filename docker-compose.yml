@@ -1,0 +1,26 @@
+# Geo-OSINT Agent — Docker Compose
+#
+# Starts the web UI server with persistent volumes for workspace config
+# and evidence storage.
+#
+# Usage:
+#   docker compose up -d
+#   open http://127.0.0.1:8080
+
+services:
+  geo-webui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # Workspace config (AGENT.md, CONTEXT.md, stage contracts, _config/)
+      - ./workspace:/app/workspace
+      # Evidence storage (captured images, index.sqlite, corrections.sqlite)
+      - ./evidence:/app/evidence
+    environment:
+      - NODE_ENV=production
+    # No inbound ports beyond 8080; egress to kartaview.org + geocoder only
+    # (enforced by docker network policy — see docs/containerization.md)
+    restart: unless-stopped
