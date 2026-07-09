@@ -108,8 +108,8 @@ function saveSettings(s: Settings): void {
 
 export function startServer(port: number = 8080) {
 	const server = createServer(handleRequest);
-	server.listen(port, "127.0.0.1", () => {
-		console.log(`geo-webui server listening on http://127.0.0.1:${port}`);
+	server.listen(port, "0.0.0.0", () => {
+		console.log(`geo-webui server listening on http://0.0.0.0:${port}`);
 	});
 	return server;
 }
