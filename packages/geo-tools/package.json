@@ -5,6 +5,9 @@
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
+	"pi": {
+		"skills": ["skills/"]
+	},
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
