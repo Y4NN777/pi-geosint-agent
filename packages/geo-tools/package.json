@@ -1,0 +1,29 @@
+{
+	"name": "@y4nn777/geo-tools",
+	"version": "0.1.0",
+	"description": "Geo-OSINT deterministic tools: reverse-geocode, KartaView discovery, image capture, evidence storage",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"clean": "shx rm -rf dist",
+		"build": "tsgo -p tsconfig.build.json",
+		"test": "vitest --run"
+	},
+	"dependencies": {
+		"shx": "^0.3.4"
+	},
+	"devDependencies": {
+		"vitest": "^3.0.0"
+	}
+}
