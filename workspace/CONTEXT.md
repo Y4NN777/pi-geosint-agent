@@ -10,7 +10,7 @@ The pipeline runs four stages sequentially:
 
 ### 01_resolve — Reverse Geocode
 - **Input:** `{ lat: number, lon: number }`
-- **Process:** Calls Nominatim (or configured geocoder). If the geocoder returns multiple possible addresses within the ambiguity threshold, constructs an `Agent` with a cheap fast model (Haiku-class/DeepSeek-class) to resolve.
+- **Process:** Calls Nominatim (or configured geocoder). If the geocoder returns multiple possible addresses within the ambiguity threshold, constructs an `Agent` with a cheap-fast model (see `_config/providers.md`) to resolve.
 - **Output:** `{ address: string, confidence: number, alternates?: Array<{address, confidence}> }`
 
 ### 02_discover — KartaView Discovery
@@ -51,9 +51,11 @@ evidence/
 
 ## Provider/Model Requirements
 
-| Stage | Provider | Model Class | Why |
-|-------|----------|-------------|-----|
-| 01_resolve (Agent path only) | Anthropic/DeepSeek | Haiku-class or DeepSeek-chat | Cheap fast model for simple disambiguation |
-| 02_discover (Agent) | Anthropic | Sonnet-class or equivalent | Stronger reasoning needed for flag/prune decisions |
-| 03_capture | None | N/A | Deterministic — no LLM |
-| 04_store | None | N/A | Deterministic — no LLM |
+Provider choice is **per-stage**, not global. See `_config/providers.md` for the full list of supported providers and configuration reference.
+
+| Stage | Model Class | Example Providers | Why |
+|-------|-------------|-------------------|-----|
+| 01_resolve (Agent path only) | Cheap-fast | Flash, Haiku, GPT-4o-mini, DeepSeek-chat class | Simple disambiguation — no heavy reasoning needed |
+| 02_discover (Agent) | Reasoning | Sonnet, GPT-5, Pro class | Stronger reasoning needed for flag/prune decisions |
+| 03_capture | N/A | — | Deterministic — no LLM |
+| 04_store | N/A | — | Deterministic — no LLM |

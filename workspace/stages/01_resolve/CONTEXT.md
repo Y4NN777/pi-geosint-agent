@@ -13,7 +13,7 @@ Accepts the following from Layer 3 configs:
 | `lat` | User/Run trigger | Latitude |
 | `lon` | User/Run trigger | Longitude |
 | Geocoder URL | `setup/questionnaire.md` | Nominatim geocoder endpoint (default: `https://nominatim.openstreetmap.org`) |
-| Model choice | `setup/questionnaire.md` | Provider/model for the agent path (default: cheap fast model — Haiku-class/DeepSeek-class) |
+| Model choice | `setup/questionnaire.md` | Provider/model for the agent path (default: cheap-fast model class; see `_config/providers.md` for available providers) |
 
 ## Process
 

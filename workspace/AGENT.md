@@ -27,7 +27,7 @@ These four rules carry into every stage's implementation. A stage that violates 
 
 1. **No autonomous git push, no unconfirmed docker exec, no credential logging.** Any action that modifies state outside the evidence directory requires explicit human approval via the review gate.
 
-2. **Every LLM-touching stage must state which provider/model it targets and why.** Stage contracts list the model class (e.g. "cheap fast model — Haiku-class/DeepSeek-class" for stage 01, "stronger reasoning model" for stage 02). Implementations must respect this.
+2. **Every LLM-touching stage must state which provider/model it targets and why.** Stage contracts list the model class appropriate to the stage (see `_config/providers.md` for the canonical provider reference). Implementations must respect this.
 
 3. **Deterministic work never goes through an LLM call.** Downloading, hashing, storing, and geocoding (non-ambiguous) are executed directly. Only ambiguity resolution (stage 01) and candidate pruning (stage 02) use an agent loop.
 

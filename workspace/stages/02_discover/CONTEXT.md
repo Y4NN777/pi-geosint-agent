@@ -13,7 +13,7 @@ Accepts the following from Layer 3 configs:
 | Resolved location | Stage 01 output | `{ address, lat, lon, confidence }` |
 | Search radius | `setup/questionnaire.md` | Default search radius in meters (default: 100) |
 | KartaView auth token | `setup/questionnaire.md` | Bearer token for authenticated API access |
-| Model choice | `setup/questionnaire.md` | Provider/model for the agent (default: stronger reasoning model — Sonnet-class) |
+| Model choice | `setup/questionnaire.md` | Provider/model for the agent (default: reasoning model class; see `_config/providers.md` for available providers) |
 | Agent tool | Implemented in Phase 2 | `check-geohash-history` — queries `index.sqlite` for prior captures |
 
 ## Process

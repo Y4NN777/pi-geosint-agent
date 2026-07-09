@@ -28,10 +28,10 @@ Answer these questions before the first run. Answers configure the pipeline at r
 
 ```json
 {
-  "question": "Which provider/model for stage 01 resolve (cheap fast model)?",
-  "recommended": "deepseek/deepseek-chat or anthropic/claude-haiku-3-5",
-  "default_provider": "deepseek",
-  "default_model": "deepseek-chat",
+  "question": "Which provider/model for stage 01 resolve (cheap-fast model class)?",
+  "recommended": "cheap-fast model class (see _config/providers.md for the full list)",
+  "default_provider": "see _config/providers.md",
+  "default_model": "see _config/providers.md",
   "type": "provider-model"
 }
 ```
@@ -40,10 +40,10 @@ Answer these questions before the first run. Answers configure the pipeline at r
 
 ```json
 {
-  "question": "Which provider/model for stage 02 discovery (stronger reasoning model)?",
-  "recommended": "anthropic/claude-sonnet-4-5",
-  "default_provider": "anthropic",
-  "default_model": "claude-sonnet-4-5",
+  "question": "Which provider/model for stage 02 discovery (reasoning model class)?",
+  "recommended": "reasoning model class (see _config/providers.md for the full list)",
+  "default_provider": "see _config/providers.md",
+  "default_model": "see _config/providers.md",
   "type": "provider-model"
 }
 ```
