@@ -377,7 +377,7 @@ Respond with a JSON array of annotated records.`;
  * calls captureDirect or captureRender based on needsRender flag.
  * A single failure does not abort the stage.
  *
- * @param candidates - Approved candidate records (human-reviewed).
+ * @param candidates - Candidate records to capture.
  * @returns CaptureStageResult with per-capture results.
  */
 export async function runStage03(candidates: CandidateRecord[]): Promise<CaptureStageResult> {
@@ -446,13 +446,13 @@ export async function runStage03(candidates: CandidateRecord[]): Promise<Capture
  * Run stage 04: store captured evidence.
  *
  * Deterministic — no Agent constructed. For each successful capture,
- * calls storeEvidence and records in SQLite. Also logs any human
- * overrides from the review gate to corrections.sqlite.
+ * calls storeEvidence and records in SQLite. Also logs optional
+ * human-override corrections to corrections.sqlite.
  *
  * @param captures - Successful capture results from stage 03.
  * @param candidates - Original candidate records (for metadata).
  * @param ctx - Stage context with storage root.
- * @param corrections - Optional human-override corrections from review gate.
+ * @param corrections - Optional human-override corrections to log.
  * @returns StoreStageResult with stored file paths.
  */
 export async function runStage04(

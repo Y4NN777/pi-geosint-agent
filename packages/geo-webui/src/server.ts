@@ -7,7 +7,6 @@
  * Endpoints:
  *   POST /runs              — start a new pipeline run { lat, lon }
  *   GET  /runs/:id/events   — SSE stream of run progress
- *   POST /runs/:id/review   — submit review-gate decision
  *   GET  /evidence          — paginated evidence query
  *   GET  /runs/:id/evidence — evidence for a specific run
  *   GET  /settings          — current settings
@@ -26,15 +25,7 @@ import { queryRecentCaptures, runStage01, runStage02, runStage03, runStage04 } f
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-type RunState =
-	| "pending"
-	| "running_01"
-	| "running_02"
-	| "awaiting_review"
-	| "running_03"
-	| "running_04"
-	| "completed"
-	| "failed";
+type RunState = "pending" | "running_01" | "running_02" | "running_03" | "running_04" | "completed" | "failed";
 
 interface PipelineRun {
 	id: string;
@@ -132,11 +123,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 			await handleSseStream(req, res, id);
 			return;
 		}
-		if (method === "POST" && path.match(/^\/runs\/([^/]+)\/review$/)) {
-			const id = path.match(/^\/runs\/([^/]+)\/review$/)![1];
-			await handleSubmitReview(req, res, id);
-			return;
-		}
+
 		if (method === "GET" && path.match(/^\/runs\/([^/]+)\/evidence$/)) {
 			const id = path.match(/^\/runs\/([^/]+)\/evidence$/)![1];
 			await handleRunEvidence(req, res, id);
@@ -240,41 +227,6 @@ function handleSseStream(req: IncomingMessage, res: ServerResponse, runId: strin
 	req.on("close", () => {
 		const idx = run.events.indexOf(res);
 		if (idx >= 0) run.events.splice(idx, 1);
-	});
-}
-
-async function handleSubmitReview(req: IncomingMessage, res: ServerResponse, runId: string) {
-	const run = runs.get(runId);
-	if (!run) {
-		respondJson(res, 404, { error: "Run not found" });
-		return;
-	}
-	if (run.state !== "awaiting_review") {
-		respondJson(res, 409, { error: `Run is in state ${run.state}, not awaiting review` });
-		return;
-	}
-
-	const body = await readBody(req);
-	let approved: CandidateRecord[];
-	try {
-		approved = JSON.parse(body).candidates;
-		if (!Array.isArray(approved)) {
-			throw new Error("candidates must be an array");
-		}
-	} catch (err) {
-		respondJson(res, 400, { error: `Invalid candidate list: ${err instanceof Error ? err.message : String(err)}` });
-		return;
-	}
-
-	run.discoveredCandidates = approved;
-	respondJson(res, 200, { status: "approved", candidateCount: approved.length });
-
-	// Continue pipeline
-	broadcast(run, { type: "review_received", candidateCount: approved.length });
-	runPipeline(run).catch((err) => {
-		run.state = "failed";
-		run.error = err instanceof Error ? err.message : String(err);
-		broadcast(run, { type: "run_error", error: run.error });
 	});
 }
 
@@ -405,19 +357,10 @@ async function runPipeline(run: PipelineRun): Promise<void> {
 				{ workspaceRoot: settings.workspaceRoot },
 			);
 			run.discoveredCandidates = discoverResult.candidates;
-			run.state = "awaiting_review";
-			broadcast(run, {
-				type: "awaiting_review",
-				stage: "02_discover",
-				result: discoverResult,
-			});
-			return; // Stop — waiting for review
+			run.state = "running_03";
+			broadcast(run, { type: "stage_end", stage: "02_discover", result: discoverResult });
 		}
-		// biome-ignore lint/suspicious/noFallthroughSwitchClause: intentional pipeline stage chaining
-		case "awaiting_review": {
-			// Fall through when review is received
-		}
-		// biome-ignore lint/suspicious/noFallthroughSwitchClause: intentional pipeline stage chaining
+		// falls through
 		case "running_03": {
 			run.state = "running_03";
 			broadcast(run, { type: "stage_start", stage: "03_capture" });

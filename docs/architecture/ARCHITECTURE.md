@@ -33,27 +33,35 @@
 │          │                               └──────────────────┘    │
 │          ▼                                                       │
 │  ┌──────────────────────────────────────────────────────────────┐ │
-│  │  01_resolve → 02_discover → [review] → 03_capture → 04_store│ │
+│  │  01_resolve → 02_discover → 03_capture → 04_store              │ │
 │  └──────────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────┘
         │                           │
         ▼                           ▼
-┌───────────────────┐   ┌─────────────────────────────────────────┐
-│  External APIs     │   │  geo-tools (deterministic functions)    │
-│                    │   │                                         │
-│  - Nominatim (OSM) │   │  ┌──────────────┐  ┌────────────────┐  │
-│  - KartaView API   │   │  │ capture-     │  │ kartaview-     │  │
-│  - (Mapillary,     │   │  │ direct       │  │ discover       │  │
-│    MV.Live)        │   │  └──────────────┘  └────────────────┘  │
-│                    │   │  ┌──────────────┐  ┌────────────────┐  │
-│                    │   │  │ capture-     │  │ reverse-       │  │
-│                    │   │  │ render       │  │ geocode        │  │
-│  xvfb + CutyCapt   │   │  └──────────────┘  └────────────────┘  │
-│  (subprocess)      │   │  ┌──────────────┐  ┌────────────────┐  │
-│                    │   │  │ store-       │  │ geohash        │  │
-│                    │   │  │ evidence     │  │                │  │
-│                    │   │  └──────────────┘  └────────────────┘  │
-└───────────────────┘   └─────────────────────────────────────────┘
+┌───────────────────┐   ┌──────────────────────────────────────────────┐
+│  External APIs     │   │  geo-tools (deterministic functions)         │
+│                    │   │                                              │
+│  - Nominatim (OSM) │   │  ┌──────────────┐  ┌──────────────────┐     │
+│  - KartaView API   │   │  │ capture-     │  │ kartaview-       │     │
+│  - Google Street    │   │  │ direct       │  │ discover         │     │
+│    View API        │   │  └──────────────┘  └──────────────────┘     │
+│  - (Mapillary,     │   │  ┌──────────────┐  ┌──────────────────┐     │
+│    MV.Live)        │   │  │ capture-     │  │ street-view-     │     │
+│                    │   │  │ render       │  │ discover         │     │
+│  xvfb + CutyCapt   │   │  └──────────────┘  └──────────────────┘     │
+│  (subprocess)      │   │  ┌──────────────┐  ┌──────────────────┐     │
+│                    │   │  │ store-       │  │ reverse-geocode  │     │
+│                    │   │  │ evidence     │  │                  │     │
+│                    │   │  └──────────────┘  └──────────────────┘     │
+│                    │   │  ┌──────────────┐  ┌──────────────────┐     │
+│                    │   │  │ parse-       │  │ heading-utils    │     │
+│                    │   │  │ coordinates  │  │                  │     │
+│                    │   │  └──────────────┘  └──────────────────┘     │
+│                    │   │  ┌──────────────┐  ┌──────────────────┐     │
+│                    │   │  │ geohash      │  │                  │     │
+│                    │   │  │              │  │                  │     │
+│                    │   │  └──────────────┘  └──────────────────┘     │
+└───────────────────┘   └──────────────────────────────────────────────┘
 ```
 
 **Interactions (key):**
@@ -101,7 +109,7 @@ When the same concept appears in two contexts (e.g. `CandidateRecord` appears in
 
 ## Data Flow on the Golden Path
 
-The golden path is the happy path: a user submits valid coordinates, stages complete without errors, the human approves candidates, evidence is stored.
+The golden path is the happy path: a user submits valid coordinates, stages complete without errors, evidence is stored.
 
 ### Step-by-step
 
@@ -128,18 +136,10 @@ User                geo-webui           geo-workspace         geo-tools        E
  │                     │                     │───────────────────>│ KartaView API │
  │                     │                     │                    │──────────────>│
  │                     │                     │                    │<──────────────│
- │                     │                     │<───────────────────│               │
- │                     │  return Discover    │                    │               │
- │                     │<────────────────────│                    │               │
- │                     │                     │                    │               │
- │  SSE: awaiting_     │                     │                    │               │
- │  review             │                     │                    │               │
- │<────────────────────│                     │                    │               │
- │                     │                     │                    │               │
- │  POST /runs/:id/    │                     │                    │               │
- │  review (candidates)│                     │                    │               │
- │────────────────────>│                     │                    │               │
- │                     │  runStage03()       │                    │               │
+│                     │                     │<───────────────────│               │
+│                     │  return Discover    │                    │               │
+│                     │<────────────────────│                    │               │
+│                     │  runStage03()       │                    │               │
  │                     │────────────────────>│                    │               │
  │                     │                     │  captureDirect() / │               │
  │                     │                     │  captureRender()   │               │
@@ -162,7 +162,7 @@ User                geo-webui           geo-workspace         geo-tools        E
 ### Key invariants on the golden path
 
 - Each stage receives exactly the output type of the previous stage (enforced by TypeScript).
-- The review gate produces `CandidateRecord[]` that stage 03 consumes. The same array is used for metadata enrichment in stage 04 (via `candidateMap`).
+- Stage 02 produces `CandidateRecord[]` that stage 03 consumes directly. The same array is used for metadata enrichment in stage 04 (via `candidateMap`).
 - Stage 03 is single-failure tolerant: a failed capture produces a `CaptureRecord` with `status: "failed"` but does not abort the for loop. Stage 04 skips failed captures.
 - Stage 04 is idempotent by SHA256: if the same image was already stored, `INSERT OR REPLACE` is a no-op.
 - SSE events are fanned out to all connected clients for a run. If a client disconnects mid-stream, their `ServerResponse` is removed from the run's events array.
@@ -203,7 +203,7 @@ User                geo-webui           geo-workspace         geo-tools        E
 
 - **The server process** — everything runs in one Node process. There is no redundancy, no graceful degradation, no load shedding. This is by design (single-analyst tool, not a multi-tenant service).
 - **`index.sqlite`** — the evidence index is a single file. Corruption makes evidence queryable only by filesystem traversal (images and sidecars survive independently).
-- **KartaView API** — the system has no fallback imagery source. If KartaView is down, stage 02 produces zero candidates and the pipeline terminates.
+- **KartaView API** — the primary imagery source. Google Street View provides a fallback, but if both are unavailable stage 02 produces zero candidates and the pipeline terminates.
 - **The `runs` Map** — in-memory state is lost on restart. Running pipelines are orphaned. No recovery mechanism exists.
 
 ## Decisions That Shape This
@@ -219,14 +219,13 @@ The system does not have formal ADRs (Architecture Decision Records). The load-b
 **Why**: The expected usage is a single analyst running investigations. Splitting into separate services (API server, pipeline worker, evidence store) would add operational complexity with zero benefit at this scale.
 **Trade-off accepted**: No horizontal scaling. Runs are sequential per process (but async). In-memory state is lost on crash.
 
-### D-003: Human review gate blocks the pipeline
-**File**: `packages/geo-webui/src/server.ts` (lines 408-414)
-**Why**: Evidence capture is an irreversible action (imagery is stored to disk). The gate ensures a human validates the candidate list before any data is written.
-**Trade-off accepted**: The SSE connection must stay open during the review pause. HTTP keep-alive and SSE reconnect handle transient disconnects.
+### D-003: Linear pipeline — no human-in-the-loop gate
+**Why**: Basic workflow should run fully automatically. All candidates are captured without manual intervention. If filtering is needed, stage 02's optional LLM agent handles it.
+**Trade-off accepted**: Irrelevant or low-quality candidates consume capture and storage resources. The optional LLM agent mitigates this.
 
-### D-004: KartaView as the primary imagery source
-**Why**: KartaView provides a free API with programmatic access to street-level imagery. Mapillary and MV.Live are listed in the pipeline description but not yet integrated.
-**Trade-off accepted**: Single-source dependency for imagery discovery. If KartaView changes its API or terms, discovery is broken until a fallback is implemented.
+### D-004: Multi-source imagery (KartaView + Google Street View)
+**Why**: Two independent sources provide complementary coverage. KartaView offers high photo density from crowd-sourced uploads; Google Street View provides reliable 4-heading (0, 90, 180, 270) coverage with an explicit heading parameter. Running both in parallel gives the best chance of complete angle coverage.
+**Trade-off accepted**: API key management for two sources. Google Street View requires a Google Cloud project with billing enabled (though $200/mo free credit covers light usage).
 
 ### D-005: SQLite with synchronous `node:sqlite` API
 **File**: `packages/geo-tools/src/store-evidence.ts`, `packages/geo-workspace/src/memory-store.ts`

@@ -14,7 +14,7 @@ import type { GeohashHistoryRecord } from "@y4nn777/geo-tools";
 // ── Types ──────────────────────────────────────────────────────────────
 
 /**
- * A human-override correction logged during the review gate.
+ * A human-override correction to a photo record.
  * Records what field was changed, from what old value to what new value.
  */
 export interface CorrectionEntry {

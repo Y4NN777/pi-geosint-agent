@@ -6,7 +6,7 @@
  */
 
 import { computeCoverage, headingToBucket } from "./heading-utils.ts";
-import { type DiscoverInput, type PhotoRecord, type Source, ToolError } from "./types.ts";
+import { type CoverageInfo, type DiscoverInput, type PhotoRecord, type Source, ToolError } from "./types.ts";
 
 const KARTAVIEW_BASE = "https://kartaview.org";
 const MAX_CALLS_PER_HOUR_UNAUTH = 100;
@@ -104,6 +104,7 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 	queryPoint: { lat: number; lon: number };
 	radiusMeters: number;
 	candidates: PhotoRecord[];
+	coverage: CoverageInfo;
 	stats: { totalDiscovered: number; flagged: number };
 }> {
 	const { lat, lon, radiusMeters, kartaviewAuthToken } = input;
