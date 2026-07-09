@@ -1,33 +1,27 @@
-# Stage 02 — Discover
+# Stage 02 — Multi-Source Discovery
 
 ## Purpose
 
-Query KartaView for nearby street-level photos around the resolved location. Flag stale or low-accuracy records. Use an LLM agent to prune the candidate list intelligently before presenting to the human for review.
+Query **KartaView** and **Google Street View** in parallel for street-level imagery around the resolved location. Merge results into a single candidate list. No LLM agent — all logic is deterministic.
 
 ## Inputs
-
-Accepts the following from Layer 3 configs:
 
 | Input | Source | Description |
 |-------|--------|-------------|
 | Resolved location | Stage 01 output | `{ address, lat, lon, confidence }` |
 | Search radius | `setup/questionnaire.md` | Default search radius in meters (default: 100) |
-| KartaView auth token | `setup/questionnaire.md` | Bearer token for authenticated API access |
-| Model choice | `setup/questionnaire.md` | Provider/model for the agent (default: reasoning model class; see `_config/providers.md` for available providers) |
-| Agent tool | Implemented in Phase 2 | `check-geohash-history` — queries `index.sqlite` for prior captures |
+| KartaView auth token | `setup/questionnaire.md` | Bearer token for authenticated API access (optional) |
+| Google Maps API key | `setup/questionnaire.md` | Required for Street View Static API |
 
 ## Process
 
-1. Call `kartaview-discover.ts` with `{ lat, lon, radiusMeters, authToken }`.
-   - Fetches sequences from `/1.0/list/nearby-photos`.
-   - For each sequence, fetches details from `/1.0/photo`.
-   - Flags records that are >2 years old or >50m from query point.
-2. Construct an `Agent` with the configured model and `check-geohash-history` as an `AgentTool`.
-3. The Agent receives the flagged record list and:
-   - Reviews flagged records, noting which flags are actionable vs. informational.
-   - Checks `check-geohash-history` to see if any area has been previously captured.
-   - Produces a pruned and annotated `candidate_sequences.json`.
-4. **Pipeline stops.** The human must review and approve via the review gate before stage 03.
+1. **Parallel source queries** (both run simultaneously):
+   - **KartaView:** Call `kartaview-discover.ts` → `GET /1.0/list/nearby-photos` → `GET /1.0/photo` per sequence. Flags stale (>2yr) or distant (>50m) records.
+   - **Google Street View:** Call `google-streetview.ts` → `GET /streetview/metadata` (check availability). If OK, build Static API URLs for headings [0, 90, 180, 270].
+
+2. **Merge:** Combine both source results into a single `candidates[]` array. Deduplicate by geohash6 proximity (records within ~60m of each other and within 1 year timestamp are deduplicated, keeping the higher-quality source).
+
+3. **Output** `candidates.json` without blocking.
 
 ## Outputs
 
@@ -37,34 +31,33 @@ Accepts the following from Layer 3 configs:
   "radiusMeters": "number",
   "candidates": [
     {
-      "sequenceId": "number",
-      "photoId": "number",
+      "source": "kartaview" | "google-streetview",
+      "id": "string",
       "lat": "number",
       "lon": "number",
       "heading": "number",
-      "capturedAt": "string (ISO 8601)",
+      "capturedAt": "string | null",
       "url": "string",
+      "sequenceId": "string",
       "flagged": "boolean",
-      "flagReason": "string | null",
-      "needsRender": "boolean",
-      "agentAnnotation": "string | null"
+      "flagReason": "string | null"
     }
   ],
   "stats": {
     "totalDiscovered": "number",
     "flagged": "number",
-    "previouslyCaptured": "number",
-    "recommendedForCapture": "number"
+    "kartaviewCount": "number",
+    "googleStreetviewCount": "number"
   }
 }
 ```
 
-## Review Gate (blocking)
+## AgentTool Available
 
-The pipeline blocks here until the human:
-- Reviews each candidate's flag status and agent annotation.
-- May edit, reject, or accept individual candidates.
-- May toggle `needsRender` on individual candidates.
-- Submits the decision via `POST /runs/:id/review`.
+- `check-geohash-history` — queries `index.sqlite` for prior captures near this area to avoid re-discovery (optional).
 
-Until the review is submitted, stage 03 will not execute.
+## Notes
+
+- No Agent is constructed. Stage 02 calls `geo-tools` functions directly.
+- Google Street View returns at most 1 result per coordinate (nearest panorama). KartaView returns many.
+- Google Street View captures 4 headings (0, 90, 180, 270). KartaView photos have a single heading each.

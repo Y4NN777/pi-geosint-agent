@@ -2,20 +2,18 @@
  * KartaView photo discovery.
  *
  * Queries the KartaView API for nearby photos and flags stale or
- * inconsistent records for human review.
- *
- * @param input - Coordinates, radius, and optional auth token
- * @returns Discovered photo records with flag annotations
- * @throws {ToolError} On API failure or rate-limit exhaustion
+ * inconsistent records. No LLM agent — all filtering is deterministic.
  */
 
-import { type DiscoverInput, type PhotoRecord, ToolError } from "./types.ts";
+import { type DiscoverInput, type PhotoRecord, type Source, ToolError } from "./types.ts";
 
 const KARTAVIEW_BASE = "https://kartaview.org";
 const MAX_CALLS_PER_HOUR_UNAUTH = 100;
 const MAX_CALLS_PER_HOUR_AUTH = 1000;
 const STALE_THRESHOLD_YEARS = 2;
 const COORD_THRESHOLD_METERS = 50;
+
+const SOURCE: Source = "kartaview";
 
 /** Simple in-memory rate-limit tracker (per-process) */
 class RateLimitTracker {
@@ -51,7 +49,6 @@ class RateLimitTracker {
 	}
 }
 
-// Singleton rate tracker for the process
 const rateTracker = new RateLimitTracker(MAX_CALLS_PER_HOUR_UNAUTH);
 
 export function setRateLimit(maxPerHour: number): void {
@@ -83,9 +80,6 @@ interface PhotoDetailResponse {
 	url: string;
 }
 
-/**
- * Compute approximate distance in meters between two coordinates (Haversine).
- */
 function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
 	const R = 6_371_000;
 	const toRad = (d: number) => (d * Math.PI) / 180;
@@ -95,9 +89,6 @@ function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number)
 	return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/**
- * Check if a date string is more than N years in the past.
- */
 function isOlderThanYears(dateStr: string, years: number): boolean {
 	const then = new Date(dateStr).getTime();
 	if (Number.isNaN(then)) return false;
@@ -106,10 +97,7 @@ function isOlderThanYears(dateStr: string, years: number): boolean {
 }
 
 /**
- * Discover nearby KartaView photos.
- *
- * Calls /1.0/list/nearby-photos then /1.0/photo per sequence.
- * Flags stale records (>2yr) and inconsistent coordinates (>50m from query).
+ * Discover nearby KartaView photos — deterministic, no LLM agent.
  */
 export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 	queryPoint: { lat: number; lon: number };
@@ -117,21 +105,19 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 	candidates: PhotoRecord[];
 	stats: { totalDiscovered: number; flagged: number };
 }> {
-	const { lat, lon, radiusMeters, authToken } = input;
+	const { lat, lon, radiusMeters, kartaviewAuthToken } = input;
 
-	// Set rate limit based on auth status
-	if (authToken) {
+	if (kartaviewAuthToken) {
 		rateTracker.setLimit(MAX_CALLS_PER_HOUR_AUTH);
 	} else {
 		rateTracker.setLimit(MAX_CALLS_PER_HOUR_UNAUTH);
 	}
 
-	// Step 1: Get nearby photo sequences
 	rateTracker.check();
 	const listUrl = `${KARTAVIEW_BASE}/1.0/list/nearby-photos?lat=${lat}&lng=${lon}&radius=${radiusMeters}`;
 	const headers: Record<string, string> = { "User-Agent": "pi-geosint-agent/0.1.0" };
-	if (authToken) {
-		headers["Authorization"] = `Bearer ${authToken}`;
+	if (kartaviewAuthToken) {
+		headers["Authorization"] = `Bearer ${kartaviewAuthToken}`;
 	}
 
 	let listResponse: Response;
@@ -160,9 +146,8 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 	}
 
 	const sequences = nearbyData.sequences ?? [];
-
-	// Step 2: For each sequence, fetch photo details
 	const candidates: PhotoRecord[] = [];
+
 	for (const seq of sequences) {
 		rateTracker.check();
 		const detailUrl = `${KARTAVIEW_BASE}/1.0/photo?sequenceId=${seq.id}`;
@@ -170,7 +155,6 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 		try {
 			detailResponse = await fetch(detailUrl, { headers, signal: AbortSignal.timeout(15_000) });
 		} catch (err) {
-			// Log but don't throw — continue with next sequence
 			console.error(
 				`Failed to fetch detail for sequence ${seq.id}: ${err instanceof Error ? err.message : String(err)}`,
 			);
@@ -190,7 +174,6 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 			continue;
 		}
 
-		// Check for staleness and coordinate inconsistency
 		let flagged = false;
 		const reasons: string[] = [];
 
@@ -206,13 +189,14 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 		}
 
 		candidates.push({
-			sequenceId: detail.sequenceId,
-			photoId: detail.id,
+			source: SOURCE,
+			id: String(detail.id),
 			lat: detail.lat,
 			lon: detail.lon,
 			heading: detail.heading,
 			capturedAt: detail.capturedAt,
 			url: detail.url,
+			sequenceId: String(detail.sequenceId),
 			flagged,
 			flagReason: reasons.length > 0 ? reasons.join("; ") : null,
 		});

@@ -1,8 +1,8 @@
 /**
- * Headless browser rendering for KartaView viewer pages.
+ * Headless browser rendering for viewer pages.
  *
- * Shells out to xvfb-run cutycapt (or fallback) to render a URL
- * to a PNG image. Used only when a candidate has needs_render: true.
+ * Shells out to xvfb-run cutycapt to render a URL
+ * to a PNG image. Used when direct download is not possible.
  *
  * No dependency on pi-agent-core. Deterministic function.
  *

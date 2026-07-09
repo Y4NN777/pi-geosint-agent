@@ -9,6 +9,7 @@ export { captureDirect } from "./capture-direct.ts";
 export { captureRender } from "./capture-render.ts";
 export { checkGeohashHistory } from "./check-geohash-history.ts";
 export { geohash7, geohashNeighbours } from "./geohash.ts";
+export { streetviewCaptureMulti, streetviewDiscover, streetviewMetadata } from "./google-streetview.ts";
 export { kartaviewDiscover, resetRateLimit, setRateLimit } from "./kartaview-discover.ts";
 export { reverseGeocode } from "./reverse-geocode.ts";
 export { storeEvidence } from "./store-evidence.ts";

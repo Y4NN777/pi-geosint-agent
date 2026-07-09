@@ -22,32 +22,6 @@ Answer these questions before the first run. Answers configure the pipeline at r
 }
 ```
 
-## Provider/Model Choices
-
-### Stage 01 — Resolve (Agent path, only if ambiguous)
-
-```json
-{
-  "question": "Which provider/model for stage 01 resolve (cheap-fast model class)?",
-  "recommended": "cheap-fast model class (see _config/providers.md for the full list)",
-  "default_provider": "see _config/providers.md",
-  "default_model": "see _config/providers.md",
-  "type": "provider-model"
-}
-```
-
-### Stage 02 — Discover (Agent path)
-
-```json
-{
-  "question": "Which provider/model for stage 02 discovery (reasoning model class)?",
-  "recommended": "reasoning model class (see _config/providers.md for the full list)",
-  "default_provider": "see _config/providers.md",
-  "default_model": "see _config/providers.md",
-  "type": "provider-model"
-}
-```
-
 ## KartaView Auth Token
 
 ```json
@@ -55,6 +29,16 @@ Answer these questions before the first run. Answers configure the pipeline at r
   "question": "Enter your KartaView Bearer auth token (leave empty for unauthenticated, 100/hr limit)",
   "type": "secret",
   "required": false
+}
+```
+
+## Google Maps API Key
+
+```json
+{
+  "question": "Enter your Google Maps API key (required for Street View; enable Street View Static API in Google Cloud Console)",
+  "type": "secret",
+  "required": true
 }
 ```
 
@@ -70,4 +54,4 @@ Answer these questions before the first run. Answers configure the pipeline at r
 
 ---
 
-**Note:** API keys for LLM providers are configured through the pi agent framework's credential store, not this questionnaire. See the `_credential-store` documentation for provider key setup.
+> **Note:** API keys for LLM providers are configured through the pi agent framework's credential store, not this questionnaire. This questionnaire covers only the geo-OSINT-specific configuration.

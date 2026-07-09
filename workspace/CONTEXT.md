@@ -1,61 +1,67 @@
-# Geo-OSINT Agent — Layer 1: Pipeline Context
+# Geo-OSINT Agent — Layer 1: Linear Pipeline Context
 
-## Stage Order
+## Pipeline
 
-The pipeline runs four stages sequentially:
+The pipeline runs four stages linearly — no branching, no review gates, no LLM agents:
 
 ```
-01_resolve  →  02_discover  →  [REVIEW GATE]  →  03_capture  →  04_store
+01_resolve → 02_discover (KartaView + Google Street View) → 03_capture → 04_store
 ```
 
 ### 01_resolve — Reverse Geocode
 - **Input:** `{ lat: number, lon: number }`
-- **Process:** Calls Nominatim (or configured geocoder). If the geocoder returns multiple possible addresses within the ambiguity threshold, constructs an `Agent` with a cheap-fast model (see `_config/providers.md`) to resolve.
-- **Output:** `{ address: string, confidence: number, alternates?: Array<{address, confidence}> }`
+- **Process:** Calls Nominatim (or configured geocoder). If ambiguous, uses deterministic tie-breaking by confidence score.
+- **Output:** `{ address: string, confidence: number, lat: number, lon: number }`
 
-### 02_discover — KartaView Discovery
-- **Input:** Resolved location
-- **Process:** Calls KartaView `/1.0/list/nearby-photos` endpoint. For each sequence, fetches photo metadata. Flags stale (>2 years old) or inconsistent (>50m from query point) records. Constructs an `Agent` with a stronger reasoning model to prune flagged records and produce a `candidate_sequences.json`.
-- **Output:** `candidate_sequences.json` — pruned and annotated list of photo records.
-- **AgentTool available:** `check-geohash-history` — queries `index.sqlite` for prior captures near this area to avoid re-discovery.
-
-### REVIEW GATE (blocking)
-- Pipeline stops after stage 02.
-- Human must review `candidate_sequences.json` via the web UI.
-- Human may approve, reject, or edit the candidate list.
-- Stage 03 does **not** run until the human explicitly approves.
+### 02_discover — Multi-Source Discovery
+- **Input:** Resolved location + API keys
+- **Process:** Queries **both** sources in parallel:
+  - **KartaView:** `/1.0/list/nearby-photos` → `/1.0/photo` per sequence. Flags stale (>2yr) or distant (>50m) records.
+  - **Google Street View:** Metadata API first (check availability), then builds capture URLs.
+  - Merges results into a single candidate list, deduplicated by geohash6 proximity.
+- **Output:** `candidates.json` — unified list of photo records from both sources.
+- **No LLM agent.** All flagging and deduplication is deterministic.
+- **No review gate.** Pipeline continues immediately to stage 03.
 
 ### 03_capture — Image Capture
-- **Input:** Approved candidate sequences
-- **Process:** No `Agent` constructed. Plain loop. For each candidate:
-  - If `needs_render: false` → `capture-direct.ts` (direct download from KartaView URL)
-  - If `needs_render: true` → `capture-render.ts` (headless CutyCapt via xvfb)
+- **Input:** Candidate records from stage 02
+- **Process:** No `Agent` constructed. For each candidate:
+  - **KartaView records:** Direct download from photo URL (`capture-direct.ts`).
+  - **Google Street View:** Static API download for headings [0, 90, 180, 270] (`google-streetview.ts` → `capture-direct.ts`).
 - **Output:** Captured image files with SHA256 hashes.
 
 ### 04_store — Evidence Storage
 - **Input:** Captured images + discovery metadata
-- **Process:** No `Agent` constructed. Computes geohash7, writes files to `evidence/{geohash}/{date}/{source}/`, writes sidecar JSON, upserts row into `index.sqlite`. Also logs any human overrides to `corrections.sqlite`.
+- **Process:** Computes geohash7, writes files to `evidence/{geohash}/{date}/{source}/`, writes sidecar JSON, upserts row into `index.sqlite`.
 - **Output:** Indexed evidence in `evidence/` directory + `index.sqlite`.
 
 ## Where Evidence Lands
 
-All evidence is written to `evidence/` at the configured storage root:
 ```
 evidence/
 └── {geohash7}/
     └── {YYYY-MM-DD}/
-        └── {source}/
-            ├── {photoId}.jpg
-            └── {photoId}.sidecar.json
+        ├── kartaview/
+        │   ├── {photoId}.jpg
+        │   └── {photoId}.sidecar.json
+        └── google-streetview/
+            ├── {pano_id}_{heading}.jpg
+            └── {pano_id}_{heading}.sidecar.json
 ```
 
-## Provider/Model Requirements
+## Source Types
 
-Provider choice is **per-stage**, not global. See `_config/providers.md` for the full list of supported providers and configuration reference.
+| Source               | Type key              | Description                              |
+|----------------------|-----------------------|------------------------------------------|
+| KartaView            | `kartaview`           | Crowd-sourced street-level photos        |
+| Google Street View   | `google-streetview`   | Google's street-level panoramas          |
 
-| Stage | Model Class | Example Providers | Why |
-|-------|-------------|-------------------|-----|
-| 01_resolve (Agent path only) | Cheap-fast | Flash, Haiku, GPT-4o-mini, DeepSeek-chat class | Simple disambiguation — no heavy reasoning needed |
-| 02_discover (Agent) | Reasoning | Sonnet, GPT-5, Pro class | Stronger reasoning needed for flag/prune decisions |
-| 03_capture | N/A | — | Deterministic — no LLM |
-| 04_store | N/A | — | Deterministic — no LLM |
+## Configuration
+
+| Setting               | Config source                      |
+|-----------------------|-------------------------------------|
+| Search radius         | `setup/questionnaire.md`            |
+| KartaView auth token  | `setup/questionnaire.md`            |
+| Google Maps API key   | `setup/questionnaire.md`            |
+| Storage root          | `setup/questionnaire.md`            |
+| Geocoder endpoint     | `setup/questionnaire.md`            |

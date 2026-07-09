@@ -2,15 +2,11 @@
  * Evidence storage with geohash bucketing and SQLite indexing.
  *
  * Writes captured images to:
- *   evidence/{geohash7}/{date}/{source}/{photoId}.{ext}
+ *   evidence/{geohash7}/{date}/{source}/{id}.{ext}
  * Writes sidecar JSON alongside.
  * Upserts the record into index.sqlite (idempotent by SHA256).
  *
  * No dependency on pi-agent-core. Deterministic function.
- *
- * @param input - Capture output + discovery metadata
- * @returns Storage paths and geohash
- * @throws {ToolError} On filesystem or database errors
  */
 
 import { existsSync } from "node:fs";
@@ -22,19 +18,12 @@ import { type StoreEvidenceInput, type StoreEvidenceResult, ToolError } from "./
 
 const EVIDENCE_DIR = "evidence";
 
-/**
- * Store a captured image and its metadata.
- *
- * @param input - Image metadata, source path, and optional storage root
- * @returns Stored file path, sidecar path, SHA256, and geohash
- * @throws {ToolError} On filesystem or database failure
- */
 export async function storeEvidence(
 	input: StoreEvidenceInput & { storageRoot?: string },
 ): Promise<StoreEvidenceResult> {
 	const {
-		photoId,
-		sequenceId,
+		source,
+		id,
 		lat,
 		lon,
 		heading,
@@ -46,19 +35,18 @@ export async function storeEvidence(
 		sizeBytes,
 		flagged,
 		flagReason,
+		sequenceId,
 	} = input;
 
 	const root = input.storageRoot ?? EVIDENCE_DIR;
 	const gh7 = geohash7(lat, lon);
-	const date = capturedAt.slice(0, 10); // YYYY-MM-DD from ISO
-	const source = "kartaview";
-	const ext = captureMethod === "render" ? ".png" : ".jpg";
+	const date = capturedAt ? capturedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+	const ext = ".jpg";
 
 	const destDir = join(root, gh7, date, source);
-	const destPath = join(destDir, `${photoId}${ext}`);
-	const sidecarPath = join(destDir, `${photoId}.sidecar.json`);
+	const destPath = join(destDir, `${id}${ext}`);
+	const sidecarPath = join(destDir, `${id}.sidecar.json`);
 
-	// Create directories
 	try {
 		await mkdir(destDir, { recursive: true });
 	} catch (err) {
@@ -68,7 +56,6 @@ export async function storeEvidence(
 		);
 	}
 
-	// Copy image file (idempotent — skip if SHA256 already exists in DB)
 	const db = openIndexDb(root);
 	try {
 		const existing = db.prepare("SELECT sha256 FROM evidence WHERE sha256 = ?").get(sha256) as
@@ -76,7 +63,6 @@ export async function storeEvidence(
 			| undefined;
 
 		if (existing) {
-			// Already stored — return existing path
 			return {
 				path: destPath,
 				sidecarPath,
@@ -85,7 +71,6 @@ export async function storeEvidence(
 			};
 		}
 
-		// Copy the file
 		try {
 			await copyFile(sourcePath, destPath);
 		} catch (err) {
@@ -95,20 +80,20 @@ export async function storeEvidence(
 			);
 		}
 
-		// Write sidecar
 		const sidecar = {
-			photoId: String(photoId),
-			sequenceId,
+			source,
+			id,
 			lat,
 			lon,
 			heading,
-			capturedAt,
+			capturedAt: capturedAt ?? null,
 			fetchedAt: new Date().toISOString(),
 			sha256,
 			sourceUrl,
 			captureMethod,
 			flagged,
 			flagReason: flagReason ?? null,
+			...(sequenceId ? { sequenceId } : {}),
 			sizeBytes,
 			geohash7: gh7,
 		};
@@ -121,7 +106,6 @@ export async function storeEvidence(
 			);
 		}
 
-		// Upsert into index.sqlite
 		db.prepare(
 			`INSERT OR REPLACE INTO evidence
 			 (geohash7, captured_at, source, photo_id, sequence_id, lat, lon, heading,
@@ -129,10 +113,10 @@ export async function storeEvidence(
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		).run(
 			gh7,
-			capturedAt,
+			capturedAt ?? date,
 			source,
-			String(photoId),
-			sequenceId,
+			id,
+			sequenceId ?? null,
 			lat,
 			lon,
 			heading,
@@ -157,9 +141,6 @@ export async function storeEvidence(
 	};
 }
 
-/**
- * Open or create index.sqlite with the evidence schema.
- */
 function openIndexDb(storageRoot: string): DatabaseSync {
 	const dbPath = join(storageRoot, "index.sqlite");
 	const dir = dirname(dbPath);
@@ -176,10 +157,10 @@ function openIndexDb(storageRoot: string): DatabaseSync {
 		CREATE TABLE IF NOT EXISTS evidence (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			geohash7 TEXT NOT NULL,
-			captured_at TEXT NOT NULL,
+			captured_at TEXT,
 			source TEXT NOT NULL DEFAULT 'kartaview',
 			photo_id TEXT NOT NULL,
-			sequence_id INTEGER,
+			sequence_id TEXT,
 			lat REAL NOT NULL,
 			lon REAL NOT NULL,
 			heading REAL,
@@ -195,7 +176,6 @@ function openIndexDb(storageRoot: string): DatabaseSync {
 		)
 	`);
 
-	// Create indexes if they don't exist
 	const indexes = [
 		"CREATE INDEX IF NOT EXISTS idx_evidence_geohash ON evidence(geohash7)",
 		"CREATE INDEX IF NOT EXISTS idx_evidence_captured_at ON evidence(captured_at)",
