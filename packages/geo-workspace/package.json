@@ -1,0 +1,30 @@
+{
+	"name": "@y4nn777/geo-workspace",
+	"version": "0.1.0",
+	"description": "Geo-OSINT workspace orchestrator: workspace-loader, stage-driver, memory-store",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"clean": "shx rm -rf dist",
+		"build": "tsgo -p tsconfig.build.json",
+		"test": "vitest --run"
+	},
+	"dependencies": {
+		"@earendil-works/pi-agent-core": "^0.80.3",
+		"@y4nn777/geo-tools": "^0.1.0"
+	},
+	"devDependencies": {
+		"vitest": "^3.0.0"
+	}
+}
