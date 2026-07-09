@@ -1,0 +1,33 @@
+{
+	"name": "@y4nn777/geo-webui",
+	"version": "0.1.0",
+	"description": "Geo-OSINT web UI: run trigger, review gate, evidence browser",
+	"type": "module",
+	"main": "./dist/server.js",
+	"types": "./dist/server.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/server.d.ts",
+			"import": "./dist/server.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"dist",
+		"src/frontend"
+	],
+	"scripts": {
+		"clean": "shx rm -rf dist",
+		"build": "tsgo -p tsconfig.build.json",
+		"start": "node dist/server.js",
+		"test": "vitest --run"
+	},
+	"dependencies": {
+		"@y4nn777/geo-tools": "^0.1.0",
+		"@y4nn777/geo-workspace": "^0.1.0"
+	},
+	"devDependencies": {
+		"@types/node": "24.12.4",
+		"vitest": "^3.0.0"
+	}
+}
