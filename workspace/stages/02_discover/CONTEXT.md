@@ -23,6 +23,20 @@ Query **KartaView** and **Google Street View** in parallel for street-level imag
 
 3. **Output** `candidates.json` without blocking.
 
+## Pre-Discovery: Coordinate Parsing
+
+Coordinate inputs accepted by `parse-coordinates.ts` (deterministic, no LLM):
+
+| Format | Example | Notes |
+|--------|---------|-------|
+| Decimal Degrees | `48.8566, 2.3522` | Standard lat,lon order |
+| DMS | `48°51'24"N 2°17'40"E` | Single/double quote markers |
+| DDM | `48 51.4' N 2°17.7' E` | Degrees decimal minutes |
+| Google Maps URL | `https://maps.google.com/?q=48.8566,2.3522` or `@48.8566,2.3522` | Shortened URLs supported |
+| Plus Code | `8FW4V75V+` | Stub — requires `open-location-code` package |
+
+**Ambiguity guard:** A bare `48.85, 2.29` is treated as (lat, lon). If the first value exceeds ±90 (e.g., lon,lat order), the parser rejects the pair rather than guessing.
+
 ## Outputs
 
 ```json
@@ -40,9 +54,16 @@ Query **KartaView** and **Google Street View** in parallel for street-level imag
       "url": "string",
       "sequenceId": "string",
       "flagged": "boolean",
-      "flagReason": "string | null"
+      "flagReason": "string | null",
+      "headingBucket": "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW"
     }
   ],
+  "coverage": {
+    "distinctHeadings": "number — how many unique 8-compass buckets have imagery",
+    "bucketsPresent": ["array of heading buckets with coverage"],
+    "bucketsMissing": ["array of heading buckets without coverage"],
+    "angleSpread": "number — degrees between min and max heading"
+  },
   "stats": {
     "totalDiscovered": "number",
     "flagged": "number",

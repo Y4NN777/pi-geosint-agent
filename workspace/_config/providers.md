@@ -38,7 +38,6 @@ pi-ai supports all major LLM providers. Any provider from the list below can be 
 | Kimi For Coding | `KIMI_API_KEY` | |
 | Xiaomi MiMo | `XIAOMI_API_KEY` | |
 | **Any OpenAI-compatible** | Custom env var | Ollama, vLLM, LM Studio, etc. Configure via `createProvider()` |
-| Google Maps/Street View | `GOOGLE_MAPS_API_KEY` | geo-OSINT only; not an LLM provider. Enable Street View Static API |
 
 > **Full reference**: See `packages/ai/README.md` in `@earendil-works/pi-ai` for complete provider details, auth resolution order, and custom provider creation.
 

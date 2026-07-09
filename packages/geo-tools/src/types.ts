@@ -5,6 +5,12 @@
 /** Supported imagery sources */
 export type Source = "kartaview" | "google-streetview";
 
+/** Heading buckets for coverage reporting */
+export type HeadingBucket = "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW";
+
+/** Coordinate parsing result */
+export type ParseResult = { ok: true; lat: number; lon: number } | { ok: false; error: string };
+
 /** Reverse geocode result */
 export interface ReverseGeocodeInput {
 	lat: number;
@@ -28,23 +34,31 @@ export interface DiscoverInput {
 
 export interface PhotoRecord {
 	source: Source;
-	/** Source-specific ID (KartaView photoId or Google pano_id) */
 	id: string;
 	lat: number;
 	lon: number;
 	heading: number;
-	capturedAt: string | null; // ISO 8601; null when only year/month known
+	capturedAt: string | null;
 	url: string;
-	/** For kartaview: sequenceId; for google: pano_id */
 	sequenceId: string;
 	flagged: boolean;
 	flagReason: string | null;
+	headingBucket: HeadingBucket;
+}
+
+/** Heading coverage per location */
+export interface CoverageInfo {
+	distinctHeadings: number;
+	bucketsPresent: HeadingBucket[];
+	bucketsMissing: HeadingBucket[];
+	angleSpread: number;
 }
 
 export interface DiscoverResult {
 	queryPoint: { lat: number; lon: number };
 	radiusMeters: number;
 	candidates: PhotoRecord[];
+	coverage: CoverageInfo;
 	stats: {
 		totalDiscovered: number;
 		flagged: number;
@@ -69,6 +83,7 @@ export interface CaptureDirectResult {
 export interface CaptureRenderInput {
 	url: string;
 	outputDir?: string;
+	zoomLevels?: string[];
 }
 
 export interface CaptureRenderResult {
@@ -121,18 +136,6 @@ export interface StreetViewMetadata {
 	lng?: number;
 	date?: string;
 	copyright?: string;
-}
-
-/** Google Street View discovery result (single panorama per location) */
-export interface StreetViewResult {
-	source: "google-streetview";
-	panoId: string;
-	lat: number;
-	lon: number;
-	heading: number;
-	capturedAt: string | null;
-	imageUrl: string;
-	metadataUrl: string;
 }
 
 /** Typed errors for deterministic tools */

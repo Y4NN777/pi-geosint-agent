@@ -42,3 +42,6 @@ collect.sh
 
 # Evidence storage
 evidence/
+
+# Draft/plan artifacts
+/.omo/drafts/

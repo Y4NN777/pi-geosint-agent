@@ -5,6 +5,7 @@
  * inconsistent records. No LLM agent — all filtering is deterministic.
  */
 
+import { computeCoverage, headingToBucket } from "./heading-utils.ts";
 import { type DiscoverInput, type PhotoRecord, type Source, ToolError } from "./types.ts";
 
 const KARTAVIEW_BASE = "https://kartaview.org";
@@ -199,15 +200,18 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 			sequenceId: String(detail.sequenceId),
 			flagged,
 			flagReason: reasons.length > 0 ? reasons.join("; ") : null,
+			headingBucket: headingToBucket(detail.heading),
 		});
 	}
 
 	const flaggedCount = candidates.filter((c) => c.flagged).length;
+	const coverage = computeCoverage(candidates.map((c) => c.heading));
 
 	return {
 		queryPoint: { lat, lon },
 		radiusMeters,
 		candidates,
+		coverage,
 		stats: {
 			totalDiscovered: candidates.length,
 			flagged: flaggedCount,
