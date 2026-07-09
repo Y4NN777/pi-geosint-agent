@@ -13,14 +13,14 @@
  * @throws {ToolError} On filesystem or database errors
  */
 
-import { copyFile, writeFile, mkdir } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
-import { existsSync } from 'node:fs';
-import { geohash7 } from './geohash.ts';
-import { ToolError, type StoreEvidenceInput, type StoreEvidenceResult } from './types.ts';
+import { existsSync } from "node:fs";
+import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { geohash7 } from "./geohash.ts";
+import { type StoreEvidenceInput, type StoreEvidenceResult, ToolError } from "./types.ts";
 
-const EVIDENCE_DIR = 'evidence';
+const EVIDENCE_DIR = "evidence";
 
 /**
  * Store a captured image and its metadata.
@@ -51,8 +51,8 @@ export async function storeEvidence(
 	const root = input.storageRoot ?? EVIDENCE_DIR;
 	const gh7 = geohash7(lat, lon);
 	const date = capturedAt.slice(0, 10); // YYYY-MM-DD from ISO
-	const source = 'kartaview';
-	const ext = captureMethod === 'render' ? '.png' : '.jpg';
+	const source = "kartaview";
+	const ext = captureMethod === "render" ? ".png" : ".jpg";
 
 	const destDir = join(root, gh7, date, source);
 	const destPath = join(destDir, `${photoId}${ext}`);
@@ -64,16 +64,16 @@ export async function storeEvidence(
 	} catch (err) {
 		throw new ToolError(
 			`Failed to create directory ${destDir}: ${err instanceof Error ? err.message : String(err)}`,
-			'FS_ERROR',
+			"FS_ERROR",
 		);
 	}
 
 	// Copy image file (idempotent — skip if SHA256 already exists in DB)
 	const db = openIndexDb(root);
 	try {
-		const existing = db
-			.prepare('SELECT sha256 FROM evidence WHERE sha256 = ?')
-			.get(sha256) as { sha256: string } | undefined;
+		const existing = db.prepare("SELECT sha256 FROM evidence WHERE sha256 = ?").get(sha256) as
+			| { sha256: string }
+			| undefined;
 
 		if (existing) {
 			// Already stored — return existing path
@@ -91,7 +91,7 @@ export async function storeEvidence(
 		} catch (err) {
 			throw new ToolError(
 				`Failed to copy ${sourcePath} to ${destPath}: ${err instanceof Error ? err.message : String(err)}`,
-				'FS_ERROR',
+				"FS_ERROR",
 			);
 		}
 
@@ -117,7 +117,7 @@ export async function storeEvidence(
 		} catch (err) {
 			throw new ToolError(
 				`Failed to write sidecar ${sidecarPath}: ${err instanceof Error ? err.message : String(err)}`,
-				'FS_ERROR',
+				"FS_ERROR",
 			);
 		}
 
@@ -161,7 +161,7 @@ export async function storeEvidence(
  * Open or create index.sqlite with the evidence schema.
  */
 function openIndexDb(storageRoot: string): DatabaseSync {
-	const dbPath = join(storageRoot, 'index.sqlite');
+	const dbPath = join(storageRoot, "index.sqlite");
 	const dir = dirname(dbPath);
 	if (!existsSync(dir)) {
 		try {
@@ -197,10 +197,10 @@ function openIndexDb(storageRoot: string): DatabaseSync {
 
 	// Create indexes if they don't exist
 	const indexes = [
-		'CREATE INDEX IF NOT EXISTS idx_evidence_geohash ON evidence(geohash7)',
-		'CREATE INDEX IF NOT EXISTS idx_evidence_captured_at ON evidence(captured_at)',
-		'CREATE INDEX IF NOT EXISTS idx_evidence_source ON evidence(source)',
-		'CREATE INDEX IF NOT EXISTS idx_evidence_sha256 ON evidence(sha256)',
+		"CREATE INDEX IF NOT EXISTS idx_evidence_geohash ON evidence(geohash7)",
+		"CREATE INDEX IF NOT EXISTS idx_evidence_captured_at ON evidence(captured_at)",
+		"CREATE INDEX IF NOT EXISTS idx_evidence_source ON evidence(source)",
+		"CREATE INDEX IF NOT EXISTS idx_evidence_sha256 ON evidence(sha256)",
 	];
 	for (const idx of indexes) {
 		db.exec(idx);

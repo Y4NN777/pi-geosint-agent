@@ -12,7 +12,7 @@
  * @throws {ToolError} On network failure or invalid response
  */
 
-import { ToolError, type ReverseGeocodeInput, type ReverseGeocodeResult } from './types.ts';
+import { type ReverseGeocodeInput, type ReverseGeocodeResult, ToolError } from "./types.ts";
 
 interface NominatimResponse {
 	display_name: string;
@@ -22,7 +22,7 @@ interface NominatimResponse {
 	lon: string;
 }
 
-const DEFAULT_ENDPOINT = 'https://nominatim.openstreetmap.org';
+const DEFAULT_ENDPOINT = "https://nominatim.openstreetmap.org";
 
 /**
  * Reverse-geocode a coordinate pair via Nominatim.
@@ -38,45 +38,38 @@ export async function reverseGeocode(
 	const url = `${endpoint}/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&accept-language=en`;
 
 	if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-		throw new ToolError(
-			`Coordinates out of range: lat=${lat}, lon=${lon}`,
-			'INVALID_COORDS',
-		);
+		throw new ToolError(`Coordinates out of range: lat=${lat}, lon=${lon}`, "INVALID_COORDS");
 	}
 
 	let response: Response;
 	try {
 		response = await fetch(url, {
-			headers: { 'User-Agent': 'pi-geosint-agent/0.1.0' },
+			headers: { "User-Agent": "pi-geosint-agent/0.1.0" },
 			signal: AbortSignal.timeout(10_000),
 		});
 	} catch (err) {
 		throw new ToolError(
 			`Failed to reach geocoder: ${err instanceof Error ? err.message : String(err)}`,
-			'NETWORK_ERROR',
+			"NETWORK_ERROR",
 		);
 	}
 
 	if (!response.ok) {
-		throw new ToolError(
-			`Geocoder returned ${response.status} ${response.statusText}`,
-			'HTTP_ERROR',
-			response.status,
-		);
+		throw new ToolError(`Geocoder returned ${response.status} ${response.statusText}`, "HTTP_ERROR", response.status);
 	}
 
 	let data: NominatimResponse | NominatimResponse[];
 	try {
 		data = (await response.json()) as NominatimResponse | NominatimResponse[];
 	} catch {
-		throw new ToolError('Invalid JSON from geocoder', 'PARSE_ERROR');
+		throw new ToolError("Invalid JSON from geocoder", "PARSE_ERROR");
 	}
 
 	// Normalize to array
 	const results = Array.isArray(data) ? data : [data];
 
 	if (results.length === 0) {
-		throw new ToolError('No results found for coordinates', 'NO_RESULTS');
+		throw new ToolError("No results found for coordinates", "NO_RESULTS");
 	}
 
 	const top = results[0];

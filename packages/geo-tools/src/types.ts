@@ -76,7 +76,7 @@ export interface StoreEvidenceInput {
 	sha256: string;
 	filePath: string;
 	sourceUrl: string;
-	captureMethod: 'direct' | 'render';
+	captureMethod: "direct" | "render";
 	sizeBytes: number;
 	flagged: boolean;
 	flagReason: string | null;
@@ -106,13 +106,9 @@ export class ToolError extends Error {
 	readonly code: string;
 	readonly statusCode?: number;
 
-	constructor(
-		message: string,
-		code: string,
-		statusCode?: number,
-	) {
+	constructor(message: string, code: string, statusCode?: number) {
 		super(message);
-		this.name = 'ToolError';
+		this.name = "ToolError";
 		this.code = code;
 		this.statusCode = statusCode;
 	}

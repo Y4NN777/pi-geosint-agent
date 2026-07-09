@@ -8,7 +8,7 @@
  * Based on the standard geohash algorithm (Gustavo Niemeyer, 2008).
  */
 
-const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
+const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 
 /**
  * Compute a 7-character geohash for the given coordinates.
@@ -24,7 +24,7 @@ export function geohash7(lat: number, lon: number, precision = 7): string {
 	let minLon = -180;
 	let maxLon = 180;
 
-	let hash = '';
+	let hash = "";
 	let bit = 0;
 	let ch = 0;
 	let even = true;
@@ -84,8 +84,8 @@ export function geohashNeighbours(hash: string): string[] {
 	const center = decodeGeohash(hash);
 	for (const [dlat, dlon] of dirs) {
 		// Approximate lat/lon shift for one geohash precision step
-		const shiftLat = (90 / (1 << (Math.ceil((hash.length * 5) / 2)))) * dlat;
-		const shiftLon = (180 / (1 << (Math.ceil((hash.length * 5) / 2)))) * dlon;
+		const shiftLat = (90 / (1 << Math.ceil((hash.length * 5) / 2))) * dlat;
+		const shiftLon = (180 / (1 << Math.ceil((hash.length * 5) / 2))) * dlon;
 		const nlat = Math.max(-90, Math.min(90, center.lat + shiftLat));
 		const nlon = center.lon + shiftLon;
 		neighbours.push(geohash7(nlat, nlon, hash.length));

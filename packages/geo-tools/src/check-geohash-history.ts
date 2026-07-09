@@ -10,13 +10,13 @@
  * @throws {ToolError} On database errors
  */
 
-import { DatabaseSync } from 'node:sqlite';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { geohashNeighbours } from './geohash.ts';
-import { ToolError, type GeohashHistoryInput, type GeohashHistoryRecord } from './types.ts';
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { geohashNeighbours } from "./geohash.ts";
+import { type GeohashHistoryInput, type GeohashHistoryRecord, ToolError } from "./types.ts";
 
-const DEFAULT_STORAGE_ROOT = 'evidence';
+const DEFAULT_STORAGE_ROOT = "evidence";
 
 /**
  * Check for prior captures near the given geohash.
@@ -25,12 +25,10 @@ const DEFAULT_STORAGE_ROOT = 'evidence';
  * @returns Array of prior capture records (empty array on first run)
  * @throws {ToolError} On database query failure
  */
-export function checkGeohashHistory(
-	input: GeohashHistoryInput & { storageRoot?: string },
-): GeohashHistoryRecord[] {
+export function checkGeohashHistory(input: GeohashHistoryInput & { storageRoot?: string }): GeohashHistoryRecord[] {
 	const { geohash: gh, radiusBuckets } = input;
 	const root = input.storageRoot ?? DEFAULT_STORAGE_ROOT;
-	const dbPath = join(root, 'index.sqlite');
+	const dbPath = join(root, "index.sqlite");
 
 	// First run — no table yet, return empty
 	if (!existsSync(dbPath)) {
@@ -41,28 +39,23 @@ export function checkGeohashHistory(
 	try {
 		db = new DatabaseSync(dbPath);
 	} catch (err) {
-		throw new ToolError(
-			`Cannot open index.sqlite: ${err instanceof Error ? err.message : String(err)}`,
-			'DB_ERROR',
-		);
+		throw new ToolError(`Cannot open index.sqlite: ${err instanceof Error ? err.message : String(err)}`, "DB_ERROR");
 	}
 
 	try {
 		// Verify the evidence table exists
-		const tableCheck = db
-			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='evidence'")
-			.get() as { name: string } | undefined;
+		const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='evidence'").get() as
+			| { name: string }
+			| undefined;
 
 		if (!tableCheck) {
 			return [];
 		}
 
 		// Query for the given geohash and optionally its neighbours
-		const buckets = radiusBuckets && radiusBuckets > 0
-			? geohashNeighbours(gh)
-			: [gh];
+		const buckets = radiusBuckets && radiusBuckets > 0 ? geohashNeighbours(gh) : [gh];
 
-		const placeholders = buckets.map(() => '?').join(',');
+		const placeholders = buckets.map(() => "?").join(",");
 		const rows = db
 			.prepare(
 				`SELECT captured_at, source, file_path as path
@@ -80,7 +73,7 @@ export function checkGeohashHistory(
 	} catch (err) {
 		throw new ToolError(
 			`Geohash history query failed: ${err instanceof Error ? err.message : String(err)}`,
-			'QUERY_ERROR',
+			"QUERY_ERROR",
 		);
 	} finally {
 		db.close();

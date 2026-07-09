@@ -9,9 +9,9 @@
  * @throws {ToolError} On API failure or rate-limit exhaustion
  */
 
-import { ToolError, type DiscoverInput, type PhotoRecord } from './types.ts';
+import { type DiscoverInput, type PhotoRecord, ToolError } from "./types.ts";
 
-const KARTAVIEW_BASE = 'https://kartaview.org';
+const KARTAVIEW_BASE = "https://kartaview.org";
 const MAX_CALLS_PER_HOUR_UNAUTH = 100;
 const MAX_CALLS_PER_HOUR_AUTH = 1000;
 const STALE_THRESHOLD_YEARS = 2;
@@ -39,7 +39,7 @@ class RateLimitTracker {
 			const waitMs = oneHour - (now - oldestInWindow) + 1000;
 			throw new ToolError(
 				`Rate limit of ${this.maxPerHour}/hr reached. Retry in ~${Math.ceil(waitMs / 60000)}m.`,
-				'RATE_LIMITED',
+				"RATE_LIMITED",
 				429,
 			);
 		}
@@ -91,9 +91,7 @@ function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number)
 	const toRad = (d: number) => (d * Math.PI) / 180;
 	const dlat = toRad(lat2 - lat1);
 	const dlon = toRad(lon2 - lon1);
-	const a =
-		Math.sin(dlat / 2) ** 2 +
-		Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dlon / 2) ** 2;
+	const a = Math.sin(dlat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dlon / 2) ** 2;
 	return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
@@ -131,9 +129,9 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 	// Step 1: Get nearby photo sequences
 	rateTracker.check();
 	const listUrl = `${KARTAVIEW_BASE}/1.0/list/nearby-photos?lat=${lat}&lng=${lon}&radius=${radiusMeters}`;
-	const headers: Record<string, string> = { 'User-Agent': 'pi-geosint-agent/0.1.0' };
+	const headers: Record<string, string> = { "User-Agent": "pi-geosint-agent/0.1.0" };
 	if (authToken) {
-		headers['Authorization'] = `Bearer ${authToken}`;
+		headers["Authorization"] = `Bearer ${authToken}`;
 	}
 
 	let listResponse: Response;
@@ -142,14 +140,14 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 	} catch (err) {
 		throw new ToolError(
 			`KartaView list request failed: ${err instanceof Error ? err.message : String(err)}`,
-			'NETWORK_ERROR',
+			"NETWORK_ERROR",
 		);
 	}
 
 	if (!listResponse.ok) {
 		throw new ToolError(
 			`KartaView list returned ${listResponse.status} ${listResponse.statusText}`,
-			'API_ERROR',
+			"API_ERROR",
 			listResponse.status,
 		);
 	}
@@ -158,7 +156,7 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 	try {
 		nearbyData = (await listResponse.json()) as NearbyPhotosResponse;
 	} catch {
-		throw new ToolError('Invalid JSON from KartaView list endpoint', 'PARSE_ERROR');
+		throw new ToolError("Invalid JSON from KartaView list endpoint", "PARSE_ERROR");
 	}
 
 	const sequences = nearbyData.sequences ?? [];
@@ -173,7 +171,9 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 			detailResponse = await fetch(detailUrl, { headers, signal: AbortSignal.timeout(15_000) });
 		} catch (err) {
 			// Log but don't throw — continue with next sequence
-			console.error(`Failed to fetch detail for sequence ${seq.id}: ${err instanceof Error ? err.message : String(err)}`);
+			console.error(
+				`Failed to fetch detail for sequence ${seq.id}: ${err instanceof Error ? err.message : String(err)}`,
+			);
 			continue;
 		}
 
@@ -214,7 +214,7 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 			capturedAt: detail.capturedAt,
 			url: detail.url,
 			flagged,
-			flagReason: reasons.length > 0 ? reasons.join('; ') : null,
+			flagReason: reasons.length > 0 ? reasons.join("; ") : null,
 		});
 	}
 
