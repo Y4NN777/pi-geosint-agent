@@ -133,22 +133,18 @@ describe("kartaviewDiscover", () => {
 
 	it("includes auth token in headers when provided", async () => {
 		let authHeader = "";
-		mockFetch((url: string) => {
-			// Don't inspect auth on the constructor call
-			return jsonResponse({ sequences: [] });
-		});
 
-		vi.stubGlobal(
-			"fetch",
-			vi.fn((url: string, init?: RequestInit) => {
-				if (url.includes("nearby-photos")) {
-					authHeader = (init?.headers as Record<string, string>)?.["Authorization"] ?? "";
-				}
-				return Promise.resolve(jsonResponse({ sequences: [] }));
-			}),
-		);
+		const origFetch = globalThis.fetch;
+		globalThis.fetch = ((url: string, init: any) => {
+			if (url.includes("nearby-photos")) {
+				authHeader = (init?.headers as Record<string, string>)?.["Authorization"] ?? "";
+			}
+			return Promise.resolve(jsonResponse({ sequences: [] }));
+		}) as typeof globalThis.fetch;
 
-		await kartaviewDiscover({ lat: 48.85, lon: 2.35, radiusMeters: 100, authToken: "tok_abc" });
+		await kartaviewDiscover({ lat: 48.85, lon: 2.35, radiusMeters: 100, kartaviewAuthToken: "tok_abc" });
+
+		globalThis.fetch = origFetch;
 		expect(authHeader).toBe("Bearer tok_abc");
 	});
 

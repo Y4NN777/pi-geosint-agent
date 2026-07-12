@@ -6,7 +6,7 @@
  */
 
 import { computeCoverage, headingToBucket } from "./heading-utils.ts";
-import { type CoverageInfo, type DiscoverInput, type PhotoRecord, type Source, ToolError } from "./types.ts";
+import { type CoverageInfo, type DiscoverInput, type DiscoverResult, type PhotoRecord, type Source, ToolError } from "./types.ts";
 
 const KARTAVIEW_BASE = "https://kartaview.org";
 const MAX_CALLS_PER_HOUR_UNAUTH = 100;
@@ -100,13 +100,7 @@ function isOlderThanYears(dateStr: string, years: number): boolean {
 /**
  * Discover nearby KartaView photos — deterministic, no LLM agent.
  */
-export async function kartaviewDiscover(input: DiscoverInput): Promise<{
-	queryPoint: { lat: number; lon: number };
-	radiusMeters: number;
-	candidates: PhotoRecord[];
-	coverage: CoverageInfo;
-	stats: { totalDiscovered: number; flagged: number };
-}> {
+export async function kartaviewDiscover(input: DiscoverInput): Promise<DiscoverResult> {
 	const { lat, lon, radiusMeters, kartaviewAuthToken } = input;
 
 	if (kartaviewAuthToken) {
@@ -216,6 +210,8 @@ export async function kartaviewDiscover(input: DiscoverInput): Promise<{
 		stats: {
 			totalDiscovered: candidates.length,
 			flagged: flaggedCount,
+			kartaviewCount: candidates.length,
+			googleStreetviewCount: 0,
 		},
 	};
 }

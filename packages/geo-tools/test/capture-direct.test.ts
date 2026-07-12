@@ -53,7 +53,7 @@ describe("captureDirect", () => {
 	it("downloads a JPEG image and returns path, sha256, bytes", async () => {
 		mockFetch(imageResponse(JPEG_BYTES, "image/jpeg"));
 
-		const result = await captureDirect({ photoId: 42, url: "https://example.com/photo.jpg" });
+		const result = await captureDirect({ id: "42", url: "https://example.com/photo.jpg" });
 		expect(result.path).toContain("/geo-tools-capture/42.jpg");
 		expect(result.sha256).toMatch(/^[a-f0-9]{64}$/);
 		expect(result.bytes).toBe(JPEG_BYTES.length);
@@ -62,39 +62,39 @@ describe("captureDirect", () => {
 	it("saves PNG with .png extension", async () => {
 		mockFetch(imageResponse(PNG_BYTES, "image/png"));
 
-		const result = await captureDirect({ photoId: 7, url: "https://example.com/photo.png" });
+		const result = await captureDirect({ id: "7", url: "https://example.com/photo.png" });
 		expect(result.path).toContain("/geo-tools-capture/7.png");
 	});
 
 	it("writes actual file to disk", async () => {
 		mockFetch(imageResponse(JPEG_BYTES, "image/jpeg"));
 
-		const result = await captureDirect({ photoId: 99, url: "https://example.com/photo.jpg" });
+		const result = await captureDirect({ id: "99", url: "https://example.com/photo.jpg" });
 		const fileBuffer = await readFile(result.path);
 		expect(new Uint8Array(fileBuffer)).toEqual(JPEG_BYTES);
 	});
 
 	it("throws ToolError for invalid URL", async () => {
-		await expect(captureDirect({ photoId: 1, url: "" })).rejects.toThrow(ToolError);
-		await expect(captureDirect({ photoId: 1, url: "ftp://bad" })).rejects.toThrow(ToolError);
+		await expect(captureDirect({ id: "1", url: "" })).rejects.toThrow(ToolError);
+		await expect(captureDirect({ id: "1", url: "ftp://bad" })).rejects.toThrow(ToolError);
 	});
 
 	it("throws ToolError on 404", async () => {
 		mockFetch(new Response("Not Found", { status: 404 }));
 
-		await expect(captureDirect({ photoId: 1, url: "https://example.com/missing" })).rejects.toThrow(ToolError);
+		await expect(captureDirect({ id: "1", url: "https://example.com/missing" })).rejects.toThrow(ToolError);
 	});
 
 	it("throws ToolError on non-image content type", async () => {
 		mockFetch(new Response("not an image", { status: 200, headers: { "content-type": "text/html" } }));
 
-		await expect(captureDirect({ photoId: 1, url: "https://example.com/page" })).rejects.toThrow(ToolError);
+		await expect(captureDirect({ id: "1", url: "https://example.com/page" })).rejects.toThrow(ToolError);
 	});
 
 	it("throws ToolError on empty response body", async () => {
 		mockFetch(new Response("", { status: 200, headers: { "content-type": "image/jpeg" } }));
 
-		await expect(captureDirect({ photoId: 1, url: "https://example.com/empty" })).rejects.toThrow(ToolError);
+		await expect(captureDirect({ id: "1", url: "https://example.com/empty" })).rejects.toThrow(ToolError);
 	});
 
 	it("throws ToolError on timeout", async () => {
@@ -104,14 +104,14 @@ describe("captureDirect", () => {
 			vi.fn(() => Promise.reject(timeoutError)),
 		);
 
-		await expect(captureDirect({ photoId: 1, url: "https://example.com/slow" })).rejects.toThrow(ToolError);
+		await expect(captureDirect({ id: "1", url: "https://example.com/slow" })).rejects.toThrow(ToolError);
 	});
 
 	it("throws ToolError for oversized payload (>50MB)", async () => {
 		const big = new Uint8Array(51 * 1024 * 1024);
 		mockFetch(imageResponse(big, "image/jpeg"));
 
-		await expect(captureDirect({ photoId: 1, url: "https://example.com/big" })).rejects.toThrow(ToolError);
+		await expect(captureDirect({ id: "1", url: "https://example.com/big" })).rejects.toThrow(ToolError);
 	});
 
 	it("throws ToolError on network error", async () => {
@@ -119,6 +119,6 @@ describe("captureDirect", () => {
 			throw new TypeError("fetch failed");
 		});
 
-		await expect(captureDirect({ photoId: 1, url: "https://example.com/fail" })).rejects.toThrow(ToolError);
+		await expect(captureDirect({ id: "1", url: "https://example.com/fail" })).rejects.toThrow(ToolError);
 	});
 });

@@ -18,8 +18,9 @@ let tempRoot: string;
 const makeInput = (
 	overrides: Partial<StoreEvidenceInput & { storageRoot?: string }> = {},
 ): StoreEvidenceInput & { storageRoot?: string } => ({
-	photoId: 1001,
-	sequenceId: 42,
+	source: "kartaview",
+	id: "1001",
+	sequenceId: "42",
 	lat: 48.8566,
 	lon: 2.3522,
 	heading: 180,
@@ -62,8 +63,8 @@ describe("storeEvidence", () => {
 		const result = await storeEvidence(makeInput({ filePath: join(tempRoot, "source.jpg") }));
 
 		const sidecar = JSON.parse(await readFile(result.sidecarPath, "utf-8"));
-		expect(sidecar.photoId).toBe("1001");
-		expect(sidecar.sequenceId).toBe(42);
+		expect(sidecar.id).toBe("1001");
+		expect(sidecar.sequenceId).toBe("42");
 		expect(sidecar.sha256).toBe("abc123def456");
 		expect(sidecar.geohash7).toBe("u09tvw0");
 		expect(sidecar.fetchedAt).toBeDefined();
@@ -79,6 +80,7 @@ describe("storeEvidence", () => {
 		expect(rows[0].sha256).toBe("abc123def456");
 		expect(rows[0].geohash7).toBe("u09tvw0");
 		expect(rows[0].photo_id).toBe("1001");
+		expect(rows[0].sequence_id).toBe("42");
 		db.close();
 	});
 

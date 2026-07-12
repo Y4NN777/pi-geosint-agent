@@ -41,7 +41,7 @@ export async function storeEvidence(
 	const root = input.storageRoot ?? EVIDENCE_DIR;
 	const gh7 = geohash7(lat, lon);
 	const date = capturedAt ? capturedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
-	const ext = ".jpg";
+	const ext = captureMethod === "render" ? ".png" : ".jpg";
 
 	const destDir = join(root, gh7, date, source);
 	const destPath = join(destDir, `${id}${ext}`);
