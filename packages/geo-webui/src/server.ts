@@ -46,6 +46,7 @@ interface Settings {
 	storageRoot: string;
 	searchRadius: number;
 	kartaviewAuthToken?: string;
+	googleMapsApiKey?: string;
 }
 
 // ── State ──────────────────────────────────────────────────────────────
@@ -353,7 +354,11 @@ async function runPipeline(run: PipelineRun): Promise<void> {
 					lon: run.resolvedLocation!.lon,
 					confidence: run.resolvedLocation!.confidence,
 				},
-				{ radiusMeters: settings.searchRadius, authToken: settings.kartaviewAuthToken },
+				{
+					radiusMeters: settings.searchRadius,
+					authToken: settings.kartaviewAuthToken,
+					googleMapsApiKey: settings.googleMapsApiKey,
+				},
 				{ workspaceRoot: settings.workspaceRoot },
 			);
 			run.discoveredCandidates = discoverResult.candidates;

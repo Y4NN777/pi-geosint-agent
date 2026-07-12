@@ -156,18 +156,26 @@ beforeEach(() => {
 		radiusMeters: 100,
 		candidates: [
 			{
-				sequenceId: 1,
-				photoId: 101,
+				id: "101",
+				sequenceId: "1",
+				source: "kartaview",
 				lat: 51.5001,
 				lon: -0.1301,
 				heading: 90,
+				headingBucket: "E",
 				capturedAt: "2024-06-01T12:00:00Z",
 				url: "https://kartaview.org/photo/101",
 				flagged: false,
 				flagReason: null,
 			},
 		],
-		stats: { totalDiscovered: 1, flagged: 0 },
+		coverage: {
+			distinctHeadings: 1,
+			bucketsPresent: ["E"],
+			bucketsMissing: ["N", "NE", "SE", "S", "SW", "W", "NW"],
+			angleSpread: 0,
+		},
+		stats: { totalDiscovered: 1, flagged: 0, kartaviewCount: 1, googleStreetviewCount: 0 },
 	});
 
 	mockCaptureDirect.mockResolvedValue({
@@ -276,7 +284,7 @@ describe("runStage02", () => {
 		expect(result.queryPoint.lon).toBe(-0.13);
 		expect(result.radiusMeters).toBe(100);
 		expect(result.candidates).toHaveLength(1);
-		expect(result.candidates[0].photoId).toBe(101);
+		expect(result.candidates[0].id).toBe("101");
 		expect(result.candidates[0].needsRender).toBe(false);
 		expect(result.candidates[0].agentAnnotation).toBeNull();
 		expect(result.stats.totalDiscovered).toBe(1);
@@ -289,7 +297,7 @@ describe("runStage02", () => {
 			lat: 51.5,
 			lon: -0.13,
 			radiusMeters: 200,
-			authToken: "bearer-token",
+			kartaviewAuthToken: "bearer-token",
 		});
 	});
 
@@ -313,8 +321,9 @@ describe("runStage03", () => {
 	it("captures all candidates via direct download", async () => {
 		const candidates = [
 			{
-				sequenceId: 1,
-				photoId: 101,
+				id: "101",
+				sequenceId: "1",
+				source: "kartaview" as const,
 				lat: 51.5,
 				lon: -0.13,
 				heading: 90,
@@ -329,7 +338,11 @@ describe("runStage03", () => {
 
 		const result = await runStage03(candidates);
 
-		expect(mockCaptureDirect).toHaveBeenCalledWith({ photoId: 101, url: "https://kartaview.org/photo/101" });
+		expect(mockCaptureDirect).toHaveBeenCalledWith({
+			source: "kartaview",
+			id: "101",
+			url: "https://kartaview.org/photo/101",
+		});
 		expect(result.captures).toHaveLength(1);
 		expect(result.captures[0].status).toBe("success");
 		expect(result.captures[0].captureMethod).toBe("direct");
@@ -340,8 +353,9 @@ describe("runStage03", () => {
 	it("uses render path for needsRender candidates", async () => {
 		const candidates = [
 			{
-				sequenceId: 2,
-				photoId: 202,
+				id: "202",
+				sequenceId: "2",
+				source: "kartaview" as const,
 				lat: 51.5,
 				lon: -0.13,
 				heading: 180,
@@ -366,8 +380,9 @@ describe("runStage03", () => {
 
 		const candidates = [
 			{
-				sequenceId: 1,
-				photoId: 101,
+				id: "101",
+				sequenceId: "1",
+				source: "kartaview" as const,
 				lat: 51.5,
 				lon: -0.13,
 				heading: 90,
@@ -379,8 +394,9 @@ describe("runStage03", () => {
 				agentAnnotation: null,
 			},
 			{
-				sequenceId: 1,
-				photoId: 102,
+				id: "102",
+				sequenceId: "1",
+				source: "kartaview" as const,
 				lat: 51.5,
 				lon: -0.131,
 				heading: 90,
@@ -408,8 +424,8 @@ describe("runStage03", () => {
 describe("runStage04", () => {
 	const captures = [
 		{
-			photoId: 101,
-			sequenceId: 1,
+			id: "101",
+			sequenceId: "1",
 			path: "/tmp/captures/101.jpg",
 			sha256: "abc123",
 			sizeBytes: 1024,
@@ -421,8 +437,9 @@ describe("runStage04", () => {
 
 	const candidates = [
 		{
-			sequenceId: 1,
-			photoId: 101,
+			id: "101",
+			sequenceId: "1",
+			source: "kartaview" as const,
 			lat: 51.5,
 			lon: -0.13,
 			heading: 90,
@@ -466,8 +483,8 @@ describe("runStage04", () => {
 		const mixedCaptures = [
 			...captures,
 			{
-				photoId: 999,
-				sequenceId: 2,
+				id: "999",
+				sequenceId: "2",
 				path: "",
 				sha256: "",
 				sizeBytes: 0,
@@ -480,8 +497,9 @@ describe("runStage04", () => {
 		const mixedCandidates = [
 			...candidates,
 			{
-				sequenceId: 2,
-				photoId: 999,
+				id: "999",
+				sequenceId: "2",
+				source: "kartaview" as const,
 				lat: 51.5,
 				lon: -0.13,
 				heading: 180,

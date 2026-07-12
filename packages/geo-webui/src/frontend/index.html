@@ -79,22 +79,7 @@ button.secondary { background: var(--surface2); color: var(--text); }
 .log-entry.stage { color: var(--accent); }
 .log-entry.done { color: var(--green); }
 .log-entry.error { color: var(--red); }
-.log-entry.review { color: var(--yellow); }
 .timestamp { color: #484f58; margin-right: 6px; }
-
-.candidate-list { display: flex; flex-direction: column; gap: 8px; }
-.candidate-item {
-	display: flex; gap: 12px; align-items: flex-start;
-	background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius);
-	padding: 12px; cursor: pointer; transition: border-color 0.15s;
-}
-.candidate-item:hover { border-color: var(--accent); }
-.candidate-item.selected { border-color: var(--green); }
-.candidate-item .thumb { width: 80px; height: 60px; background: #000; border-radius: 4px; flex-shrink: 0; object-fit: cover; }
-.candidate-item .info { flex: 1; min-width: 0; }
-.candidate-item .info .name { font-weight: 600; font-size: 13px; }
-.candidate-item .info .meta { color: var(--text2); font-size: 11px; }
-.candidate-item .checkbox { margin-top: 8px; }
 
 .evidence-grid {
 	display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;
@@ -180,18 +165,6 @@ button.secondary { background: var(--surface2); color: var(--text); }
 		<div id="log-stream" class="log-stream"></div>
 	</div>
 
-	<div id="review-card" class="card" style="display:none">
-		<div class="panel-header">
-			<h3>Review Candidates</h3>
-			<span id="candidate-count" class="count">0 selected</span>
-		</div>
-		<div id="candidate-list" class="candidate-list"></div>
-		<div class="form-row" style="margin-top:12px">
-			<button id="btn-approve" class="secondary">Approve Selected</button>
-			<button id="btn-approve-all" class="secondary">Approve All</button>
-		</div>
-	</div>
-
 </div>
 
 <!-- ── Runs Tab ─────────────────────────────────────────────────── -->
@@ -258,9 +231,12 @@ button.secondary { background: var(--surface2); color: var(--text); }
 			<label>Search Radius (m)
 				<input id="set-radius" type="number" />
 			</label>
-			<label>KartaView Token
-				<input id="set-token" type="password" />
-			</label>
+		<label>KartaView Token
+			<input id="set-token" type="password" />
+		</label>
+		<label>Google Maps API Key
+			<input id="set-gmaps-key" type="password" />
+		</label>
 		</div>
 		<div class="settings-actions">
 			<button id="btn-save-settings">Save</button>
@@ -274,8 +250,6 @@ button.secondary { background: var(--surface2); color: var(--text); }
 // ── State ──────────────────────────────────────────────────────────────
 let currentRunId = null;
 let eventSource = null;
-let allCandidates = [];
-let candidateCheckState = [];
 let evidenceOffset = 0;
 const EVIDENCE_PAGE = 50;
 
@@ -352,7 +326,6 @@ function connectRun(runId) {
 	const card = document.getElementById('run-card');
 	card.style.display = 'block';
 	document.getElementById('run-id-display').textContent = runId.slice(0, 8) + '…';
-	document.getElementById('review-card').style.display = 'none';
 	document.getElementById('log-stream').innerHTML = '';
 	addLog('Connecting to run...', 'stage');
 
@@ -381,14 +354,6 @@ function handleEvent(event) {
 		case 'stage_end':
 			addLog('Stage ' + event.stage + ' complete', 'done');
 			break;
-		case 'awaiting_review':
-			addLog('Review needed — ' + (event.result?.candidates?.length || 0) + ' candidates', 'review');
-			showReview(event.result);
-			break;
-		case 'review_received':
-			addLog('Review submitted, continuing...', 'done');
-			document.getElementById('review-card').style.display = 'none';
-			break;
 		case 'run_complete':
 			addLog('Pipeline complete!', 'done');
 			badge.textContent = 'completed';
@@ -399,78 +364,6 @@ function handleEvent(event) {
 			badge.textContent = 'failed';
 			badge.className = 'status-badge failed';
 			break;
-	}
-}
-
-// ── Review Panel ───────────────────────────────────────────────────────
-function showReview(result) {
-	allCandidates = result?.result?.candidates || result?.candidates || [];
-	candidateCheckState = allCandidates.map(() => true);
-	renderCandidates();
-	document.getElementById('review-card').style.display = 'block';
-}
-
-function renderCandidates() {
-	const container = document.getElementById('candidate-list');
-	const count = document.getElementById('candidate-count');
-	const selectedCount = candidateCheckState.filter(Boolean).length;
-	count.textContent = `${selectedCount} of ${allCandidates.length} selected`;
-
-	if (allCandidates.length === 0) {
-		container.innerHTML = '<div class="empty-state">No candidates found</div>';
-		return;
-	}
-
-	container.innerHTML = '';
-	allCandidates.forEach((c, i) => {
-		const div = document.createElement('div');
-		div.className = 'candidate-item' + (candidateCheckState[i] ? ' selected' : '');
-		const thumb = c.thumbnailUrl
-			? `<img class="thumb" src="${c.thumbnailUrl}" alt="" onerror="this.style.display='none'" />`
-			: '<div class="thumb"></div>';
-		div.innerHTML = `
-			${thumb}
-			<div class="info">
-				<div class="name">${c.title || c.name || 'Candidate ' + (i + 1)}</div>
-				<div class="meta">${[c.source, c.date, c.id].filter(Boolean).join(' · ')}</div>
-				<div class="checkbox">
-					<label><input type="checkbox" ${candidateCheckState[i] ? 'checked' : ''} /> Include in capture</label>
-				</div>
-			</div>`;
-		const cb = div.querySelector('input[type="checkbox"]');
-		cb.addEventListener('change', () => {
-			candidateCheckState[i] = cb.checked;
-			div.classList.toggle('selected', cb.checked);
-			const sc = candidateCheckState.filter(Boolean).length;
-			count.textContent = `${sc} of ${allCandidates.length} selected`;
-		});
-		container.appendChild(div);
-	});
-}
-
-document.getElementById('btn-approve').addEventListener('click', async () => {
-	const selected = allCandidates.filter((_, i) => candidateCheckState[i]);
-	await submitReview(selected);
-});
-
-document.getElementById('btn-approve-all').addEventListener('click', async () => {
-	await submitReview(allCandidates);
-});
-
-async function submitReview(candidates) {
-	if (!currentRunId) return;
-	try {
-		const res = await fetch(`/runs/${currentRunId}/review`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ candidates }),
-		});
-		if (!res.ok) {
-			const e = await res.json();
-			addLog('Review error: ' + (e.error || res.statusText), 'error');
-		}
-	} catch (err) {
-		addLog('Network error submitting review: ' + err.message, 'error');
 	}
 }
 
@@ -575,6 +468,7 @@ async function loadSettings() {
 		document.getElementById('set-storage').value = s.storageRoot || '';
 		document.getElementById('set-radius').value = s.searchRadius || 100;
 		document.getElementById('set-token').value = s.kartaviewAuthToken || '';
+		document.getElementById('set-gmaps-key').value = s.googleMapsApiKey || '';
 	} catch (err) {
 		document.getElementById('settings-status').textContent = 'Failed: ' + err.message;
 		document.getElementById('settings-status').style.color = 'var(--red)';
@@ -587,6 +481,7 @@ async function saveSettings() {
 		storageRoot: document.getElementById('set-storage').value,
 		searchRadius: parseInt(document.getElementById('set-radius').value) || 100,
 		kartaviewAuthToken: document.getElementById('set-token').value || undefined,
+		googleMapsApiKey: document.getElementById('set-gmaps-key').value || undefined,
 	};
 	try {
 		const res = await fetch('/settings', {

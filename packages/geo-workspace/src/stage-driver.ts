@@ -25,6 +25,7 @@ import {
 	type StoreEvidenceInput,
 	type StoreEvidenceResult,
 	storeEvidence,
+	streetviewDiscover,
 } from "@y4nn777/geo-tools";
 import { type CorrectionEntry, logCorrection, openCorrectionsDb, openIndexDb } from "./memory-store.ts";
 import { assembleSystemPrompt } from "./workspace-loader.ts";
@@ -71,8 +72,8 @@ export interface DiscoverStageResult {
  * Single capture output record.
  */
 export interface CaptureRecord {
-	photoId: number;
-	sequenceId: number;
+	id: string;
+	sequenceId: string;
 	path: string;
 	sha256: string;
 	sizeBytes: number;
@@ -98,7 +99,7 @@ export interface CaptureStageResult {
  * Single stored evidence record.
  */
 export interface StoredRecord {
-	photoId: number;
+	id: string;
 	path: string;
 	sidecarPath: string;
 	sha256: string;
@@ -216,7 +217,7 @@ Please analyze these results and decide which address is most likely correct bas
  */
 export async function runStage02(
 	location: { address: string; lat: number; lon: number; confidence: number },
-	options: { radiusMeters: number; authToken?: string },
+	options: { radiusMeters: number; authToken?: string; googleMapsApiKey?: string },
 	ctx: StageContext,
 ): Promise<DiscoverStageResult> {
 	// Step 1: raw discovery from KartaView
@@ -224,10 +225,28 @@ export async function runStage02(
 		lat: location.lat,
 		lon: location.lon,
 		radiusMeters: options.radiusMeters,
-		authToken: options.authToken,
+		kartaviewAuthToken: options.authToken,
 	});
 
-	// Step 2: check geohash history for prior captures
+	// Step 2: Google Street View discovery (parallel source)
+	let gsvCandidates: PhotoRecord[] = [];
+	if (options.googleMapsApiKey) {
+		try {
+			const gsvResult = await streetviewDiscover(location.lat, location.lon, options.googleMapsApiKey);
+			gsvCandidates = gsvResult.candidates;
+		} catch (err) {
+			console.error(`Street View discovery failed: ${err instanceof Error ? err.message : String(err)}`);
+		}
+	}
+
+	// Merge: deduplicate by proximity (geohash6) — prefer KartaView over GSV
+	const gsvDeduped = gsvCandidates.filter((gsv) => {
+		const ghGsv = geohash7(gsv.lat, gsv.lon, 6);
+		return !rawResult.candidates.some((kv) => geohash7(kv.lat, kv.lon, 6) === ghGsv);
+	});
+	const merged = [...rawResult.candidates, ...gsvDeduped];
+
+	// Step 3: check geohash history for prior captures
 	const storageRoot = ctx.storageRoot ?? "./evidence";
 	let previouslyCapturedCount = 0;
 	try {
@@ -287,13 +306,13 @@ export async function runStage02(
 			getApiKey: ctx.agentConfig?.getApiKey,
 		});
 
-		const prunePrompt = `Review the following KartaView photo records discovered near "${location.address}" (${location.lat}, ${location.lon}, radius: ${options.radiusMeters}m).
+		const prunePrompt = `Review the following photo records discovered near "${location.address}" (${location.lat}, ${location.lon}, radius: ${options.radiusMeters}m).
 
-${rawResult.candidates.length} records found, ${rawResult.stats.flagged} flagged:
-${rawResult.candidates
+${merged.length} records total (${rawResult.candidates.length} from KartaView, ${gsvCandidates.length} from Google Street View), ${merged.filter((c) => c.flagged).length} flagged:
+${merged
 	.map(
 		(c) =>
-			`  [${c.flagged ? "FLAGGED" : "OK"}] photo ${c.photoId} seq ${c.sequenceId} at (${c.lat}, ${c.lon}) ${c.flagReason ? `— ${c.flagReason}` : ""}`,
+			`  [${c.flagged ? "FLAGGED" : "OK"}] ${c.source} ${c.id} heading ${c.heading}° at (${c.lat}, ${c.lon}) ${c.flagReason ? `— ${c.flagReason}` : ""}`,
 	)
 	.join("\n")}
 
@@ -316,7 +335,7 @@ Respond with a JSON array of annotated records.`;
 			lastMsg?.role === "assistant" && lastMsg.content?.[0]?.type === "text" ? lastMsg.content[0].text : "";
 
 		// Attempt to parse JSON from agent response
-		let annotated: Array<{ photoId: number; needsRender: boolean; agentAnnotation: string }> = [];
+		let annotated: Array<{ id: string; needsRender: boolean; agentAnnotation: string }> = [];
 		try {
 			const jsonMatch = agentText.match(/\[[\s\S]*\]/);
 			if (jsonMatch) {
@@ -326,10 +345,10 @@ Respond with a JSON array of annotated records.`;
 			// Parsing failed — use defaults
 		}
 
-		const annotationMap = new Map(annotated.map((a) => [a.photoId, a]));
+		const annotationMap = new Map(annotated.map((a) => [a.id, a]));
 
-		for (const c of rawResult.candidates) {
-			const annotation = annotationMap.get(c.photoId);
+		for (const c of merged) {
+			const annotation = annotationMap.get(c.id);
 			const nr = annotation?.needsRender ?? guessNeedsRender(c.url);
 			candidates.push({
 				...c,
@@ -342,7 +361,7 @@ Respond with a JSON array of annotated records.`;
 		}
 	} else {
 		// No agent — pass through with defaults
-		for (const c of rawResult.candidates) {
+		for (const c of merged) {
 			const nr = guessNeedsRender(c.url);
 			candidates.push({
 				...c,
@@ -360,8 +379,8 @@ Respond with a JSON array of annotated records.`;
 		radiusMeters: options.radiusMeters,
 		candidates,
 		stats: {
-			totalDiscovered: rawResult.candidates.length,
-			flagged: rawResult.stats.flagged,
+			totalDiscovered: merged.length,
+			flagged: candidates.filter((c) => c.flagged).length,
 			previouslyCaptured: previouslyCapturedCount,
 			recommendedForCapture,
 		},
@@ -387,9 +406,9 @@ export async function runStage03(candidates: CandidateRecord[]): Promise<Capture
 	for (const c of candidates) {
 		try {
 			if (!c.needsRender) {
-				const result = await captureDirect({ photoId: c.photoId, url: c.url });
+				const result = await captureDirect({ source: c.source, id: c.id, url: c.url });
 				captures.push({
-					photoId: c.photoId,
+					id: c.id,
 					sequenceId: c.sequenceId,
 					path: result.path,
 					sha256: result.sha256,
@@ -402,20 +421,19 @@ export async function runStage03(candidates: CandidateRecord[]): Promise<Capture
 			} else {
 				const result = await captureRender({ url: c.url });
 				captures.push({
-					photoId: c.photoId,
+					id: c.id,
 					sequenceId: c.sequenceId,
 					path: result.path,
 					sha256: result.sha256,
-					sizeBytes: 0, // render result doesn't include bytes
+					sizeBytes: 0,
 					captureMethod: "render",
 					status: "success",
 					error: null,
 				});
-				// captureRender doesn't return byte count — we could stat the file
 			}
 		} catch (err) {
 			captures.push({
-				photoId: c.photoId,
+				id: c.id,
 				sequenceId: c.sequenceId,
 				path: "",
 				sha256: "",
@@ -463,20 +481,21 @@ export async function runStage04(
 ): Promise<StoreStageResult> {
 	const storageRoot = ctx.storageRoot ?? "./evidence";
 	const successCaptures = captures.filter((c) => c.status === "success");
-	const candidateMap = new Map(candidates.map((c) => [c.photoId, c]));
+	const candidateMap = new Map(candidates.map((c) => [c.id, c]));
 
 	const stored: StoredRecord[] = [];
 	let totalBytes = 0;
 
 	for (const cap of successCaptures) {
-		const cand = candidateMap.get(cap.photoId);
+		const cand = candidateMap.get(cap.id);
 		if (!cand) {
 			continue;
 		}
 
 		try {
 			const evidenceInput: StoreEvidenceInput & { storageRoot?: string } = {
-				photoId: cap.photoId,
+				source: cand.source,
+				id: cap.id,
 				sequenceId: cap.sequenceId,
 				lat: cand.lat,
 				lon: cand.lon,
@@ -495,7 +514,7 @@ export async function runStage04(
 			const result: StoreEvidenceResult = await storeEvidence(evidenceInput);
 
 			stored.push({
-				photoId: cap.photoId,
+				id: cap.id,
 				path: result.path,
 				sidecarPath: result.sidecarPath,
 				sha256: result.sha256,
